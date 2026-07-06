@@ -50,87 +50,11 @@ export function SettingsModal({
     }
   };
 
-  const sqlScript = `-- 1. Expenditures and Sponsor Pledges Table
-CREATE TABLE IF NOT EXISTS expenditures (
-  id TEXT PRIMARY KEY,
-  item_name TEXT NOT NULL,
-  cost NUMERIC NOT NULL,
-  category TEXT NOT NULL,
-  needed_by DATE NOT NULL,
-  status TEXT DEFAULT 'Pending',
-  pledged_by_email TEXT,
-  pledged_by_name TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
-);
+  const sqlScript = `-- UPGRADE PATH (Run if tables already exist):
+-- ALTER TABLE authorized_users ADD COLUMN IF NOT EXISTS is_greenlit BOOLEAN DEFAULT FALSE;
+-- UPDATE authorized_users SET is_greenlit = TRUE WHERE email LIKE '%@cardinalsystems.org';
 
--- Enable Row Level Security (RLS) for Expenditures
-ALTER TABLE expenditures ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Public Read Access" ON expenditures;
-DROP POLICY IF EXISTS "Auth Modification Access" ON expenditures;
-
--- Anonymous users (and all authenticated profiles) can read expenditures
-CREATE POLICY "Public Read Access" ON expenditures
-  FOR SELECT USING (true);
-
--- Authenticated team members and sponsors can update to insert or pledge
-CREATE POLICY "Auth Modification Access" ON expenditures
-  FOR ALL USING (auth.role() = 'authenticated');
-
--- 2. News and Project Reports Table
-CREATE TABLE IF NOT EXISTS news_updates (
-  id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  content TEXT NOT NULL,
-  created_at TEXT NOT NULL,
-  author TEXT NOT NULL
-);
-
-ALTER TABLE news_updates ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Public News Read" ON news_updates;
-DROP POLICY IF EXISTS "Authenticated News Write" ON news_updates;
-
-CREATE POLICY "Public News Read" ON news_updates FOR SELECT USING (true);
-CREATE POLICY "Authenticated News Write" ON news_updates FOR ALL USING (auth.role() = 'authenticated');
-
--- 3. Judge Feedback & Scorecard Table
-CREATE TABLE IF NOT EXISTS judge_feedback (
-  id TEXT PRIMARY KEY,
-  judge_email TEXT NOT NULL,
-  judge_name TEXT NOT NULL,
-  category TEXT NOT NULL,
-  score INTEGER NOT NULL,
-  comments TEXT NOT NULL,
-  created_at TEXT NOT NULL
-);
-
-ALTER TABLE judge_feedback ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Public Feedback Read" ON judge_feedback;
-DROP POLICY IF EXISTS "Authenticated Feedback Write" ON judge_feedback;
-
-CREATE POLICY "Public Feedback Read" ON judge_feedback FOR SELECT USING (true);
-CREATE POLICY "Authenticated Feedback Write" ON judge_feedback FOR ALL USING (auth.role() = 'authenticated');
-
--- 4. Pending account requests
-CREATE TABLE IF NOT EXISTS account_requests (
-  id TEXT PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  notes TEXT,
-  status TEXT DEFAULT 'Pending',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-ALTER TABLE account_requests ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Public request inserts" ON account_requests;
-DROP POLICY IF EXISTS "Authenticated request controls" ON account_requests;
-
-CREATE POLICY "Public request inserts" ON account_requests FOR INSERT WITH CHECK (true);
-CREATE POLICY "Authenticated request controls" ON account_requests FOR ALL USING (auth.role() = 'authenticated');
-
--- 5. Authorized Users Table
+-- 1. Create Tables (If Not Exist)
 CREATE TABLE IF NOT EXISTS authorized_users (
   id TEXT PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
@@ -141,14 +65,68 @@ CREATE TABLE IF NOT EXISTS authorized_users (
   is_greenlit BOOLEAN DEFAULT FALSE
 );
 
-ALTER TABLE authorized_users ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public Read Authorized" ON authorized_users;
-DROP POLICY IF EXISTS "Admin Write Authorized" ON authorized_users;
-CREATE POLICY "Public Read Authorized" ON authorized_users FOR SELECT USING (true);
-CREATE POLICY "Admin Write Authorized" ON authorized_users FOR ALL USING (auth.role() = 'authenticated');
+CREATE TABLE IF NOT EXISTS nodes (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  department TEXT NOT NULL,
+  status TEXT NOT NULL,
+  planned_start DATE NOT NULL,
+  planned_end DATE NOT NULL,
+  actual_start DATE,
+  actual_end DATE,
+  dependency TEXT
+);
 
+CREATE TABLE IF NOT EXISTS cad_iterations (
+  id TEXT PRIMARY KEY,
+  date TEXT NOT NULL,
+  cad_file_ref TEXT NOT NULL,
+  weight_grams NUMERIC NOT NULL,
+  drag_coefficient_cd NUMERIC NOT NULL,
+  status TEXT NOT NULL,
+  model_url TEXT,
+  model_name TEXT
+);
 
--- 6. Sponsor Commitments Table
+CREATE TABLE IF NOT EXISTS expenditures (
+  id TEXT PRIMARY KEY,
+  item_name TEXT NOT NULL,
+  cost NUMERIC NOT NULL,
+  category TEXT NOT NULL,
+  needed_by DATE NOT NULL,
+  status TEXT DEFAULT 'Pending',
+  pledged_by_email TEXT,
+  pledged_by_name TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS news_updates (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  author TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS judge_feedback (
+  id TEXT PRIMARY KEY,
+  judge_email TEXT NOT NULL,
+  judge_name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  score INTEGER NOT NULL,
+  comments TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS account_requests (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  notes TEXT,
+  status TEXT DEFAULT 'Pending',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS sponsor_commitments (
   id TEXT PRIMARY KEY,
   sponsor_email TEXT NOT NULL,
@@ -161,51 +139,71 @@ CREATE TABLE IF NOT EXISTS sponsor_commitments (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- 2. Enable Row-Level Security (RLS) on all tables
+ALTER TABLE authorized_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE nodes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cad_iterations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expenditures ENABLE ROW LEVEL SECURITY;
+ALTER TABLE news_updates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE judge_feedback ENABLE ROW LEVEL SECURITY;
+ALTER TABLE account_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sponsor_commitments ENABLE ROW LEVEL SECURITY;
+
+-- 3. Drop existing policies (to prevent 'policy already exists' errors)
+DROP POLICY IF EXISTS "Public Read Authorized" ON authorized_users;
+DROP POLICY IF EXISTS "Admin Write Authorized" ON authorized_users;
+DROP POLICY IF EXISTS "Public Read Nodes" ON nodes;
+DROP POLICY IF EXISTS "Auth Write Nodes" ON nodes;
+DROP POLICY IF EXISTS "Public Read Iterations" ON cad_iterations;
+DROP POLICY IF EXISTS "Auth Write Iterations" ON cad_iterations;
+DROP POLICY IF EXISTS "Public Read Expenditures" ON expenditures;
+DROP POLICY IF EXISTS "Auth Write Expenditures" ON expenditures;
+DROP POLICY IF EXISTS "Public Read News" ON news_updates;
+DROP POLICY IF EXISTS "Auth Write News" ON news_updates;
+DROP POLICY IF EXISTS "Public Read Feedback" ON judge_feedback;
+DROP POLICY IF EXISTS "Auth Write Feedback" ON judge_feedback;
+DROP POLICY IF EXISTS "Public request inserts" ON account_requests;
+DROP POLICY IF EXISTS "Authenticated request controls" ON account_requests;
 DROP POLICY IF EXISTS "Public commitments read" ON sponsor_commitments;
 DROP POLICY IF EXISTS "Auth commitments write" ON sponsor_commitments;
+
+-- 4. Create security policies
+CREATE POLICY "Public Read Authorized" ON authorized_users FOR SELECT USING (true);
+CREATE POLICY "Admin Write Authorized" ON authorized_users FOR ALL USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Public Read Nodes" ON nodes FOR SELECT USING (true);
+CREATE POLICY "Auth Write Nodes" ON nodes FOR ALL USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Public Read Iterations" ON cad_iterations FOR SELECT USING (true);
+CREATE POLICY "Auth Write Iterations" ON cad_iterations FOR ALL USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Public Read Expenditures" ON expenditures FOR SELECT USING (true);
+CREATE POLICY "Auth Write Expenditures" ON expenditures FOR ALL USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Public Read News" ON news_updates FOR SELECT USING (true);
+CREATE POLICY "Auth Write News" ON news_updates FOR ALL USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Public Read Feedback" ON judge_feedback FOR SELECT USING (true);
+CREATE POLICY "Auth Write Feedback" ON judge_feedback FOR ALL USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Public request inserts" ON account_requests FOR INSERT WITH CHECK (true);
+CREATE POLICY "Authenticated request controls" ON account_requests FOR ALL USING (auth.role() = 'authenticated');
+
 CREATE POLICY "Public commitments read" ON sponsor_commitments FOR SELECT USING (true);
 CREATE POLICY "Auth commitments write" ON sponsor_commitments FOR ALL USING (auth.role() = 'authenticated');
 
--- 7. Nodes (Gantt Milestones) Table
-CREATE TABLE IF NOT EXISTS nodes (
-  id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  description TEXT NOT NULL,
-  department TEXT NOT NULL,
-  status TEXT NOT NULL,
-  planned_start TEXT NOT NULL,
-  planned_end TEXT NOT NULL,
-  actual_start TEXT,
-  actual_end TEXT,
-  dependency TEXT
-);
+-- 5. Seed Administrative Accounts securely inside the database (overrides/updates if they exist)
+INSERT INTO authorized_users (id, email, role, password, notes, is_greenlit)
+VALUES
+  ('AUTH-contact', 'contact@cardinalsystems.org', 'Team', 'Cardinal@2025', 'Lead Administrator Account', true),
+  ('AUTH-raghav', 'raghav@cardinalsystems.org', 'Team', 'raghav', 'Lead Admin - Raghav', true),
+  ('AUTH-manthan', 'manthan@cardinalsystems.org', 'Team', 'manthan', 'Team Member - Manthan', true),
+  ('AUTH-neel', 'neel@cardinalsystems.org', 'Team', 'neel', 'Team Member - Neel', true),
+  ('AUTH-rudra', 'rudra@cardinalsystems.org', 'Team', 'rudra', 'Team Member - Rudra', true)
+ON CONFLICT (email) DO UPDATE 
+SET password = EXCLUDED.password, role = EXCLUDED.role, notes = EXCLUDED.notes, is_greenlit = EXCLUDED.is_greenlit;
 
-ALTER TABLE nodes ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public nodes read" ON nodes;
-DROP POLICY IF EXISTS "Auth nodes write" ON nodes;
-CREATE POLICY "Public nodes read" ON nodes FOR SELECT USING (true);
-CREATE POLICY "Auth nodes write" ON nodes FOR ALL USING (auth.role() = 'authenticated');
-
--- 8. CAD Iterations Table
-CREATE TABLE IF NOT EXISTS cad_iterations (
-  id TEXT PRIMARY KEY,
-  date TEXT NOT NULL,
-  cad_file_ref TEXT NOT NULL,
-  weight_grams NUMERIC NOT NULL,
-  drag_coefficient_cd NUMERIC NOT NULL,
-  status TEXT NOT NULL,
-  model_url TEXT,
-  model_name TEXT
-);
-
-ALTER TABLE cad_iterations ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Public iterations read" ON cad_iterations;
-DROP POLICY IF EXISTS "Auth iterations write" ON cad_iterations;
-CREATE POLICY "Public iterations read" ON cad_iterations FOR SELECT USING (true);
-CREATE POLICY "Auth iterations write" ON cad_iterations FOR ALL USING (auth.role() = 'authenticated');
-
--- 9. Enable Realtime Replication
+-- 6. Enable Supabase Realtime Replication for All tables
 ALTER PUBLICATION supabase_realtime ADD TABLE nodes;
 ALTER PUBLICATION supabase_realtime ADD TABLE cad_iterations;
 ALTER PUBLICATION supabase_realtime ADD TABLE expenditures;
