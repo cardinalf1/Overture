@@ -66,6 +66,9 @@ CREATE TABLE IF NOT EXISTS expenditures (
 -- Enable Row Level Security (RLS) for Expenditures
 ALTER TABLE expenditures ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Public Read Access" ON expenditures;
+DROP POLICY IF EXISTS "Auth Modification Access" ON expenditures;
+
 -- Anonymous users (and all authenticated profiles) can read expenditures
 CREATE POLICY "Public Read Access" ON expenditures
   FOR SELECT USING (true);
@@ -85,6 +88,9 @@ CREATE TABLE IF NOT EXISTS news_updates (
 
 ALTER TABLE news_updates ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Public News Read" ON news_updates;
+DROP POLICY IF EXISTS "Authenticated News Write" ON news_updates;
+
 CREATE POLICY "Public News Read" ON news_updates FOR SELECT USING (true);
 CREATE POLICY "Authenticated News Write" ON news_updates FOR ALL USING (auth.role() = 'authenticated');
 
@@ -101,6 +107,9 @@ CREATE TABLE IF NOT EXISTS judge_feedback (
 
 ALTER TABLE judge_feedback ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Public Feedback Read" ON judge_feedback;
+DROP POLICY IF EXISTS "Authenticated Feedback Write" ON judge_feedback;
+
 CREATE POLICY "Public Feedback Read" ON judge_feedback FOR SELECT USING (true);
 CREATE POLICY "Authenticated Feedback Write" ON judge_feedback FOR ALL USING (auth.role() = 'authenticated');
 
@@ -113,6 +122,9 @@ CREATE TABLE IF NOT EXISTS account_requests (
 );
 
 ALTER TABLE account_requests ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public request inserts" ON account_requests;
+DROP POLICY IF EXISTS "Authenticated request controls" ON account_requests;
 
 CREATE POLICY "Public request inserts" ON account_requests FOR INSERT WITH CHECK (true);
 CREATE POLICY "Authenticated request controls" ON account_requests FOR ALL USING (auth.role() = 'authenticated');

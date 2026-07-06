@@ -409,6 +409,9 @@ CREATE TABLE IF NOT EXISTS account_requests (
 -- Enable RLS for Account Requests (Public can insert, authenticated admins can read/delete)
 ALTER TABLE account_requests ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Public request inserts" ON account_requests;
+DROP POLICY IF EXISTS "Authenticated request controls" ON account_requests;
+
 CREATE POLICY "Public request inserts" ON account_requests FOR INSERT WITH CHECK (true);
 CREATE POLICY "Authenticated request controls" ON account_requests FOR ALL USING (auth.role() = 'authenticated');`}
                   </pre>
