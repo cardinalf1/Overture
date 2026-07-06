@@ -67,6 +67,7 @@ export interface AuthorizedUser {
   password?: string;
   notes?: string;
   created_at?: string;
+  is_greenlit?: boolean;
 }
 
 export interface SponsorCommitment {

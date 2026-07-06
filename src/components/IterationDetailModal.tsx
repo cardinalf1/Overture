@@ -73,6 +73,11 @@ export function IterationDetailModal({ iteration, onClose, onUploadModel, onEdit
             {iteration.model_url ? (
               <div className="flex-1 relative">
                 <ModelViewer url={iteration.model_url} />
+                <label className="absolute bottom-4 right-4 z-30 px-3 py-1.5 bg-zinc-900/90 backdrop-blur text-zinc-300 hover:text-white hover:border-zinc-500 rounded border border-zinc-700 text-[10px] font-mono uppercase tracking-widest cursor-pointer flex items-center gap-1.5 transition-colors">
+                  <Upload className="w-3.5 h-3.5" />
+                  Update 3D Model (.STL)
+                  <input type="file" accept=".stl" className="hidden" onChange={handleFileChange} />
+                </label>
               </div>
             ) : (
               <div 

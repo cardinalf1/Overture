@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { Node, CadIteration, ExpenditureItem, NewsUpdate, JudgeFeedback, AuthorizedUser } from '../types';
+import { Node, CadIteration, ExpenditureItem, NewsUpdate, JudgeFeedback, AuthorizedUser, SponsorCommitment } from '../types';
 
 export const supabaseService = {
   // --- Nodes (Tasks) ---
@@ -327,7 +327,8 @@ export const supabaseService = {
           role: user.role,
           password: user.password || '',
           notes: user.notes || '',
-          created_at: user.created_at || new Date().toISOString()
+          created_at: user.created_at || new Date().toISOString(),
+          is_greenlit: user.is_greenlit ?? false
         });
       if (error) throw error;
     } catch (e) {
@@ -416,6 +417,96 @@ export const supabaseService = {
       if (error) throw error;
     } catch (e) {
       console.error('Error deleting account request:', e);
+    }
+  },
+
+  // --- Sponsor Commitments ---
+  async getSponsorCommitments(): Promise<SponsorCommitment[]> {
+    if (!isSupabaseConfigured || !supabase) return [];
+    try {
+      const { data, error } = await supabase
+        .from('sponsor_commitments')
+        .select('*')
+        .order('due_date', { ascending: true });
+
+      if (error) {
+        if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
+          console.warn('Table "sponsor_commitments" does not exist yet.');
+          return [];
+        }
+        throw error;
+      }
+      return (data || []) as SponsorCommitment[];
+    } catch (e) {
+      console.error('Error fetching sponsor commitments:', e);
+      return [];
+    }
+  },
+
+  async upsertSponsorCommitment(commitment: SponsorCommitment): Promise<void> {
+    if (!isSupabaseConfigured || !supabase) return;
+    try {
+      const { error } = await supabase
+        .from('sponsor_commitments')
+        .upsert({
+          id: commitment.id,
+          sponsor_email: commitment.sponsor_email,
+          sponsor_name: commitment.sponsor_name,
+          title: commitment.title,
+          description: commitment.description,
+          due_date: commitment.due_date,
+          status: commitment.status,
+          assigned_by: commitment.assigned_by
+        });
+      if (error) throw error;
+    } catch (e) {
+      console.error('Error upserting sponsor commitment:', e);
+    }
+  },
+
+  async deleteSponsorCommitment(id: string): Promise<void> {
+    if (!isSupabaseConfigured || !supabase) return;
+    try {
+      const { error } = await supabase
+        .from('sponsor_commitments')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    } catch (e) {
+      console.error('Error deleting sponsor commitment:', e);
+    }
+  },
+
+  async signUpUser(email: string, role: string, password: string, name: string): Promise<any> {
+    if (!isSupabaseConfigured || !supabase) return null;
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || '';
+      const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || '';
+      
+      const tempSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        }
+      });
+      
+      const { data, error } = await tempSupabase.auth.signUp({
+        email: email.toLowerCase().trim(),
+        password: password.trim(),
+        options: {
+          data: {
+            role,
+            name,
+          }
+        }
+      });
+      
+      if (error) throw error;
+      return data.user;
+    } catch (e) {
+      console.error('Error registering user in Supabase Auth:', e);
+      throw e;
     }
   },
 

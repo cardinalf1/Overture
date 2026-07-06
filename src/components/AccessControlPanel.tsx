@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   ShieldAlert, UserPlus, Trash2, Mail, CheckCircle2, UserCheck, 
-  Lock, Copy, Check, Info, HelpCircle, Key, RefreshCw, Eye, EyeOff, Send
+  Lock, Copy, Check, Info, HelpCircle, Key, RefreshCw, Eye, EyeOff, Send, Edit2
 } from 'lucide-react';
 import { AuthorizedUser } from '../types';
 
@@ -10,6 +10,7 @@ interface AccessControlPanelProps {
   authorizedUsers: AuthorizedUser[];
   onAddAuthorizedUser: (user: Omit<AuthorizedUser, 'id'>) => void;
   onDeleteAuthorizedUser: (id: string) => void;
+  onUpdateAuthorizedUser: (user: AuthorizedUser) => void;
   accountRequests: any[];
   onDeleteAccountRequest: (id: string) => void;
 }
@@ -27,6 +28,7 @@ export function AccessControlPanel({
   authorizedUsers,
   onAddAuthorizedUser,
   onDeleteAuthorizedUser,
+  onUpdateAuthorizedUser,
   accountRequests,
   onDeleteAccountRequest
 }: AccessControlPanelProps) {
@@ -34,12 +36,40 @@ export function AccessControlPanel({
   const [role, setRole] = useState<'Team' | 'Sponsor' | 'Judge'>('Sponsor');
   const [password, setPassword] = useState(() => generateRandomPassword());
   const [notes, setNotes] = useState('');
+  const [greenlightImmediately, setGreenlightImmediately] = useState(true);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedKit, setCopiedKit] = useState(false);
+
+  // Inline editing state variables
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editRole, setEditRole] = useState<'Team' | 'Sponsor' | 'Judge'>('Sponsor');
+  const [editPassword, setEditPassword] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+
+  const startEdit = (user: AuthorizedUser) => {
+    setEditingUserId(user.id);
+    setEditRole(user.role);
+    setEditPassword(user.password || '');
+    setEditNotes(user.notes || '');
+  };
+
+  const cancelEdit = () => {
+    setEditingUserId(null);
+  };
+
+  const saveEdit = (user: AuthorizedUser) => {
+    onUpdateAuthorizedUser({
+      ...user,
+      role: editRole,
+      password: editPassword,
+      notes: editNotes
+    });
+    setEditingUserId(null);
+  };
 
   const handleRegeneratePassword = () => {
     setPassword(generateRandomPassword());
@@ -59,7 +89,8 @@ export function AccessControlPanel({
       email: email.toLowerCase().trim(),
       role,
       password: password.trim(),
-      notes: notes || `Assigned ${role} credentials`
+      notes: notes || `Assigned ${role} credentials`,
+      is_greenlit: greenlightImmediately
     });
 
     setSuccessMsg(`✔ Account pre-configured for ${emailLower(email)} with designated password.`);
@@ -215,6 +246,20 @@ Please use these credentials to sign in directly.
                 />
               </div>
 
+              {/* Greenlight toggle on creation */}
+              <div className="flex items-center gap-2 py-1 select-none">
+                <input
+                  type="checkbox"
+                  id="greenlight-checkbox"
+                  checked={greenlightImmediately}
+                  onChange={(e) => setGreenlightImmediately(e.target.checked)}
+                  className="rounded border-zinc-900 bg-black text-emerald-500 focus:ring-0 focus:ring-offset-0 cursor-pointer w-4 h-4"
+                />
+                <label htmlFor="greenlight-checkbox" className="text-[10px] font-mono tracking-wider text-zinc-500 uppercase cursor-pointer">
+                  GREENLIGHT ACCOUNT IMMEDIATELY
+                </label>
+              </div>
+
               <button
                 type="submit"
                 className="w-full text-xs font-mono bg-zinc-100 hover:bg-white text-black py-2.5 rounded font-bold uppercase transition-colors flex items-center justify-center gap-2 cursor-pointer"
@@ -272,13 +317,13 @@ Please use these credentials to sign in directly.
               </span>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono border-collapse">
+            <div className="overflow-x-auto">              <table className="w-full text-left text-xs font-mono border-collapse">
                 <thead>
                   <tr className="border-b border-zinc-900 text-[9px] text-zinc-500 uppercase tracking-widest">
                     <th className="pb-3 font-normal">EMAIL ADDRESS</th>
                     <th className="pb-3 font-normal">ACCESS LEVEL</th>
                     <th className="pb-3 font-normal">ASSIGNED PASSWORD</th>
+                    <th className="pb-3 font-normal">STATUS</th>
                     <th className="pb-3 font-normal">MEMORANDUM / NOTES</th>
                     <th className="pb-3 font-normal text-right">DISPATCH / ACTION</th>
                   </tr>
@@ -286,7 +331,7 @@ Please use these credentials to sign in directly.
                 <tbody className="divide-y divide-zinc-900">
                   {authorizedUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-zinc-600 uppercase text-[10px] leading-relaxed">
+                      <td colSpan={6} className="py-8 text-center text-zinc-600 uppercase text-[10px] leading-relaxed">
                         <ShieldAlert className="w-5 h-5 text-zinc-700 mx-auto mb-2" />
                         NO AUTHORIZED USERS REGISTERED YET.<br />
                         CREATE A SPONSOR OR JUDGE ACCOUNT ON THE LEFT.
@@ -294,70 +339,145 @@ Please use these credentials to sign in directly.
                     </tr>
                   ) : (
                     authorizedUsers.map(user => {
+                      const isEditing = user.id === editingUserId;
                       const isPassVisible = !!visiblePasswords[user.id];
                       return (
-                        <tr key={user.id} className="hover:bg-zinc-900/10 transition-all">
-                          <td className="py-3.5 text-zinc-200 pr-4 font-bold max-w-[150px] truncate" title={user.email}>
+                        <tr key={user.id} className="hover:bg-zinc-900/10 transition-all align-middle">
+                          <td className="py-3.5 text-zinc-200 pr-4 font-bold max-w-[140px] truncate" title={user.email}>
                             {user.email}
                           </td>
                           <td className="py-3.5 pr-4">
-                            <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded border ${
-                              user.role === 'Team' 
-                                ? 'bg-amber-950/20 text-amber-400 border-amber-900/40' 
-                                : user.role === 'Sponsor'
-                                ? 'bg-emerald-950/20 text-emerald-400 border-emerald-900/40'
-                                : 'bg-blue-950/20 text-blue-400 border-blue-900/40'
-                            }`}>
-                              {user.role}
-                            </span>
+                            {isEditing ? (
+                              <select
+                                value={editRole}
+                                onChange={(e) => setEditRole(e.target.value as any)}
+                                className="bg-black border border-zinc-900 rounded px-1.5 py-1 text-[11px] font-mono text-zinc-200 focus:outline-none focus:border-zinc-800"
+                              >
+                                <option value="Sponsor">Sponsor</option>
+                                <option value="Judge">Judge</option>
+                                <option value="Team">Team</option>
+                              </select>
+                            ) : (
+                              <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded border ${
+                                user.role === 'Team' 
+                                  ? 'bg-amber-950/20 text-amber-400 border-amber-900/40' 
+                                  : user.role === 'Sponsor'
+                                  ? 'bg-emerald-950/20 text-emerald-400 border-emerald-900/40'
+                                  : 'bg-blue-950/20 text-blue-400 border-blue-900/40'
+                              }`}>
+                                {user.role}
+                              </span>
+                            )}
                           </td>
                           <td className="py-3.5 pr-4 text-zinc-300">
-                            <div className="flex items-center gap-1.5 font-mono">
-                              <span className="text-[11px]">
-                                {isPassVisible ? (user.password || '—') : '••••••••'}
-                              </span>
-                              <button
-                                onClick={() => togglePasswordVisibility(user.id)}
-                                className="text-zinc-600 hover:text-zinc-400"
-                                title="Toggle Visibility"
-                              >
-                                {isPassVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                              </button>
-                            </div>
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={editPassword}
+                                onChange={(e) => setEditPassword(e.target.value)}
+                                className="bg-black border border-zinc-900 rounded px-1.5 py-1 text-[11px] font-mono text-zinc-200 w-24 focus:outline-none focus:border-zinc-800"
+                              />
+                            ) : (
+                              <div className="flex items-center gap-1.5 font-mono">
+                                <span className="text-[11px]">
+                                  {isPassVisible ? (user.password || '—') : '••••••••'}
+                                </span>
+                                <button
+                                  onClick={() => togglePasswordVisibility(user.id)}
+                                  className="text-zinc-650 hover:text-zinc-400"
+                                  title="Toggle Visibility"
+                                >
+                                  {isPassVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3.5 pr-4">
+                            <button
+                              onClick={() => {
+                                onUpdateAuthorizedUser({
+                                  ...user,
+                                  is_greenlit: !user.is_greenlit
+                                });
+                              }}
+                              className={`text-[9px] font-mono uppercase px-2.5 py-1 rounded-full border transition-colors cursor-pointer font-bold ${
+                                user.is_greenlit
+                                  ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/40 hover:bg-emerald-900/20'
+                                  : 'bg-zinc-900/60 text-zinc-500 border-zinc-800/60 hover:bg-zinc-800/30'
+                              }`}
+                              title={user.is_greenlit ? "Click to suspend / make dormant" : "Click to greenlight account"}
+                            >
+                              {user.is_greenlit ? '● GREENLIT' : '○ DORMANT'}
+                            </button>
                           </td>
                           <td className="py-3.5 text-zinc-400 pr-4 max-w-[150px] truncate" title={user.notes}>
-                            {user.notes || '-'}
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={editNotes}
+                                onChange={(e) => setEditNotes(e.target.value)}
+                                className="bg-black border border-zinc-900 rounded px-1.5 py-1 text-[11px] font-mono text-zinc-200 w-full focus:outline-none focus:border-zinc-800"
+                              />
+                            ) : (
+                              user.notes || '-'
+                            )}
                           </td>
                           <td className="py-3.5 text-right">
-                            <div className="flex items-center justify-end gap-2.5">
-                              <button
-                                onClick={() => copyLoginKit(user)}
-                                className="text-[10px] font-mono text-zinc-400 hover:text-white px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 flex items-center gap-1 transition-all"
-                                title="Copy Login Kit for User"
-                              >
-                                {copiedId === user.id ? (
-                                  <>
-                                    <Check className="w-3 h-3 text-emerald-500" />
-                                    <span>COPIED</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Copy className="w-3 h-3" />
-                                    <span>KIT</span>
-                                  </>
-                                )}
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (confirm(`Revoke authorization and delete account credentials for "${user.email}"?`)) {
-                                    onDeleteAuthorizedUser(user.id);
-                                  }
-                                }}
-                                className="text-zinc-600 hover:text-rose-400 p-1 rounded transition-colors cursor-pointer"
-                                title="Revoke Permission"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                            <div className="flex items-center justify-end gap-2">
+                              {isEditing ? (
+                                <>
+                                  <button
+                                    onClick={() => saveEdit(user)}
+                                    className="text-[10px] font-mono text-emerald-400 hover:text-white px-2 py-1 rounded bg-emerald-950/20 border border-emerald-900/40 hover:bg-emerald-900/50 transition-colors uppercase font-bold cursor-pointer"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={cancelEdit}
+                                    className="text-[10px] font-mono text-zinc-400 hover:text-white px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 transition-all cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => copyLoginKit(user)}
+                                    className="text-[10px] font-mono text-zinc-400 hover:text-white px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 flex items-center gap-1 transition-all"
+                                    title="Copy Login Kit for User"
+                                  >
+                                    {copiedId === user.id ? (
+                                      <>
+                                        <Check className="w-3 h-3 text-emerald-500" />
+                                        <span>COPIED</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Copy className="w-3 h-3" />
+                                        <span>KIT</span>
+                                      </>
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={() => startEdit(user)}
+                                    className="text-zinc-500 hover:text-white p-1 rounded transition-colors cursor-pointer"
+                                    title="Edit details"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (confirm(`Revoke authorization and delete account credentials for "${user.email}"?`)) {
+                                        onDeleteAuthorizedUser(user.id);
+                                      }
+                                    }}
+                                    className="text-zinc-650 hover:text-rose-400 p-1 rounded transition-colors cursor-pointer"
+                                    title="Revoke Permission"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -388,16 +508,23 @@ Please use these credentials to sign in directly.
                 </p>
                 <div className="relative">
                   <pre className="bg-black text-[9px] text-zinc-300 font-mono p-3 rounded border border-zinc-900 overflow-x-auto select-all whitespace-pre">
-{`CREATE TABLE IF NOT EXISTS authorized_users (
+{`-- Run this to update existing tables to support greenlighting:
+ALTER TABLE authorized_users ADD COLUMN IF NOT EXISTS is_greenlit BOOLEAN DEFAULT FALSE;
+
+-- Update admin accounts to be greenlit automatically:
+UPDATE authorized_users SET is_greenlit = TRUE WHERE email LIKE '%@cardinalsystems.org';
+
+-- Schema Table Definitions:
+CREATE TABLE IF NOT EXISTS authorized_users (
   id TEXT PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('Team', 'Sponsor', 'Judge')),
-  password TEXT,
+  password TEXT NOT NULL,
   notes TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  is_greenlit BOOLEAN DEFAULT FALSE
 );
 
--- 2. Pending account requests
 CREATE TABLE IF NOT EXISTS account_requests (
   id TEXT PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
@@ -406,14 +533,50 @@ CREATE TABLE IF NOT EXISTS account_requests (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Enable RLS for Account Requests (Public can insert, authenticated admins can read/delete)
-ALTER TABLE account_requests ENABLE ROW LEVEL SECURITY;
+CREATE TABLE IF NOT EXISTS sponsor_commitments (
+  id TEXT PRIMARY KEY,
+  sponsor_email TEXT NOT NULL,
+  sponsor_name TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  due_date TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('In Queue', 'In Progress', 'Fulfilled')),
+  assigned_by TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
+-- Enable Row-Level Security (RLS)
+ALTER TABLE authorized_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE account_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sponsor_commitments ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if any
+DROP POLICY IF EXISTS "Public Read Authorized" ON authorized_users;
+DROP POLICY IF EXISTS "Admin Write Authorized" ON authorized_users;
 DROP POLICY IF EXISTS "Public request inserts" ON account_requests;
 DROP POLICY IF EXISTS "Authenticated request controls" ON account_requests;
+DROP POLICY IF EXISTS "Public commitments read" ON sponsor_commitments;
+DROP POLICY IF EXISTS "Auth commitments write" ON sponsor_commitments;
+
+-- Security Policies
+CREATE POLICY "Public Read Authorized" ON authorized_users FOR SELECT USING (true);
+CREATE POLICY "Admin Write Authorized" ON authorized_users FOR ALL USING (auth.role() = 'authenticated');
 
 CREATE POLICY "Public request inserts" ON account_requests FOR INSERT WITH CHECK (true);
-CREATE POLICY "Authenticated request controls" ON account_requests FOR ALL USING (auth.role() = 'authenticated');`}
+CREATE POLICY "Authenticated request controls" ON account_requests FOR ALL USING (auth.role() = 'authenticated');
+
+CREATE POLICY "Public commitments read" ON sponsor_commitments FOR SELECT USING (true);
+CREATE POLICY "Auth commitments write" ON sponsor_commitments FOR ALL USING (auth.role() = 'authenticated');
+
+-- Enable Supabase Realtime Replication for All tables
+ALTER PUBLICATION supabase_realtime ADD TABLE nodes;
+ALTER PUBLICATION supabase_realtime ADD TABLE cad_iterations;
+ALTER PUBLICATION supabase_realtime ADD TABLE expenditures;
+ALTER PUBLICATION supabase_realtime ADD TABLE news_updates;
+ALTER PUBLICATION supabase_realtime ADD TABLE judge_feedback;
+ALTER PUBLICATION supabase_realtime ADD TABLE authorized_users;
+ALTER PUBLICATION supabase_realtime ADD TABLE account_requests;
+ALTER PUBLICATION supabase_realtime ADD TABLE sponsor_commitments;`}
                   </pre>
                 </div>
               </div>

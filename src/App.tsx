@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { TopStats } from './components/TopStats';
 import { Header } from './components/Header';
 import { GanttChart } from './components/GanttChart';
@@ -13,7 +13,7 @@ import { initialNodes } from './data/mockNodes';
 import { initialIterations } from './data/mockIterations';
 import { Role, Status, Node, Department, CadIteration, ExpenditureItem, NewsUpdate, JudgeFeedback, AuthorizedUser, SponsorCommitment } from './types';
 import { exportSystemData, importSystemData } from './utils/csv';
-import { isSupabaseConfigured } from './lib/supabase';
+import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { supabaseService } from './lib/supabaseService';
 import { useAuth } from './components/AuthGate';
 import { sendEmail } from './lib/emailService';
@@ -103,8 +103,13 @@ const defaultFeedbacks: JudgeFeedback[] = [
 ];
 
 export default function App() {
-  const { isSupabaseActive, role: authRole, user, name: authName } = useAuth();
+  const { isSupabaseActive, role: authRole, user, name: authName, signOut } = useAuth();
   const [currentRole, setCurrentRole] = useState<Role>('PM');
+
+  const userRef = useRef(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
   const [activeModule, setActiveModule] = useState('Command Center');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -237,6 +242,7 @@ export default function App() {
         let remoteFeedback = await supabaseService.getJudgeFeedback();
         let remoteAuthUsers = await supabaseService.getAuthorizedUsers();
         let remoteAccountRequests = await supabaseService.getAccountRequests();
+        let remoteSponsorCommitments = await supabaseService.getSponsorCommitments();
 
         // Seed if core tables are completely empty (helps user get started instantly!)
         if (remoteNodes.length === 0 && remoteIterations.length === 0) {
@@ -264,12 +270,44 @@ export default function App() {
           remoteAuthUsers = await supabaseService.getAuthorizedUsers();
         }
 
+        // Seed default commitments if empty in Supabase
+        if (remoteSponsorCommitments.length === 0) {
+          console.log('Seeding default sponsor commitments to Supabase...');
+          const defaultSponsorCommitments = [
+            {
+              id: 'commit-1',
+              sponsor_email: 'sponsor1@example.com',
+              sponsor_name: 'Autodesk',
+              title: 'Review CAD Clearance Tolerances',
+              description: 'Verify 0.5mm clearance on front spoiler mounting assemblies.',
+              due_date: '2026-07-15',
+              status: 'In Queue' as const,
+              assigned_by: 'Admin'
+            },
+            {
+              id: 'commit-2',
+              sponsor_email: 'sponsor1@example.com',
+              sponsor_name: 'Autodesk',
+              title: 'Submit Vector Brand Assets',
+              description: 'Provide high-contrast vector file versions for physical decals on milled car bodies.',
+              due_date: '2026-07-20',
+              status: 'In Progress' as const,
+              assigned_by: 'Admin'
+            }
+          ];
+          for (const c of defaultSponsorCommitments) {
+            await supabaseService.upsertSponsorCommitment(c);
+          }
+          remoteSponsorCommitments = await supabaseService.getSponsorCommitments();
+        }
+
         if (remoteNodes.length > 0) setNodes(remoteNodes);
         if (remoteIterations.length > 0) setIterations(remoteIterations);
         if (remoteExpenditures.length > 0) setExpenditures(remoteExpenditures);
         if (remoteNews.length > 0) setNewsUpdates(remoteNews);
         if (remoteFeedback.length > 0) setJudgeFeedbacks(remoteFeedback);
         if (remoteAuthUsers.length > 0) setAuthorizedUsers(remoteAuthUsers);
+        if (remoteSponsorCommitments.length > 0) setSponsorCommitments(remoteSponsorCommitments);
         if (remoteAccountRequests.length > 0) {
           setAccountRequests(remoteAccountRequests);
         } else {
@@ -309,6 +347,175 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('cardinal_authorized_users', JSON.stringify(authorizedUsers));
   }, [authorizedUsers]);
+
+  // Centralized Supabase Realtime Database Synchronization Engine
+  useEffect(() => {
+    if (!isSupabaseActive || !supabase) return;
+
+    const channel = supabase
+      .channel('db-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'nodes' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            setNodes(prev => {
+              const exists = prev.some(item => item.id === payload.new.id);
+              const updated = exists
+                ? prev.map(item => item.id === payload.new.id ? (payload.new as Node) : item)
+                : [...prev, payload.new as Node];
+              return updated.sort((a, b) => (a.planned_start || '').localeCompare(b.planned_start || ''));
+            });
+          } else if (payload.eventType === 'DELETE') {
+            setNodes(prev => prev.filter(item => item.id !== payload.old.id));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'cad_iterations' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            setIterations(prev => {
+              const exists = prev.some(item => item.id === payload.new.id);
+              const updated = exists
+                ? prev.map(item => item.id === payload.new.id ? (payload.new as CadIteration) : item)
+                : [...prev, payload.new as CadIteration];
+              return updated.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+            });
+          } else if (payload.eventType === 'DELETE') {
+            setIterations(prev => prev.filter(item => item.id !== payload.old.id));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'expenditures' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            setExpenditures(prev => {
+              const exists = prev.some(item => item.id === payload.new.id);
+              const updated = exists
+                ? prev.map(item => item.id === payload.new.id ? (payload.new as ExpenditureItem) : item)
+                : [...prev, payload.new as ExpenditureItem];
+              return updated.sort((a, b) => (a.needed_by || '').localeCompare(b.needed_by || ''));
+            });
+          } else if (payload.eventType === 'DELETE') {
+            setExpenditures(prev => prev.filter(item => item.id !== payload.old.id));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'news_updates' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            setNewsUpdates(prev => {
+              const exists = prev.some(item => item.id === payload.new.id);
+              const updated = exists
+                ? prev.map(item => item.id === payload.new.id ? (payload.new as NewsUpdate) : item)
+                : [...prev, payload.new as NewsUpdate];
+              return updated.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+            });
+          } else if (payload.eventType === 'DELETE') {
+            setNewsUpdates(prev => prev.filter(item => item.id !== payload.old.id));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'judge_feedback' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            setJudgeFeedbacks(prev => {
+              const exists = prev.some(item => item.id === payload.new.id);
+              const updated = exists
+                ? prev.map(item => item.id === payload.new.id ? (payload.new as JudgeFeedback) : item)
+                : [...prev, payload.new as JudgeFeedback];
+              return updated.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+            });
+          } else if (payload.eventType === 'DELETE') {
+            setJudgeFeedbacks(prev => prev.filter(item => item.id !== payload.old.id));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'authorized_users' },
+        (payload) => {
+          const currentUser = userRef.current;
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const updatedUser = payload.new as AuthorizedUser;
+            setAuthorizedUsers(prev => {
+              const exists = prev.some(item => item.id === updatedUser.id);
+              const updated = exists
+                ? prev.map(item => item.id === updatedUser.id ? updatedUser : item)
+                : [...prev, updatedUser];
+              return updated.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+            });
+
+            if (currentUser && currentUser.email?.toLowerCase().trim() === updatedUser.email.toLowerCase().trim()) {
+              if (updatedUser.is_greenlit === false) {
+                signOut();
+              }
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = payload.old.id;
+            let deletedEmail = '';
+            setAuthorizedUsers(prev => {
+              const found = prev.find(item => item.id === deletedId);
+              if (found) {
+                deletedEmail = found.email;
+              }
+              return prev.filter(item => item.id !== deletedId);
+            });
+
+            if (currentUser && deletedEmail && currentUser.email?.toLowerCase().trim() === deletedEmail.toLowerCase().trim()) {
+              signOut();
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'account_requests' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            setAccountRequests(prev => {
+              const exists = prev.some(item => item.id === payload.new.id);
+              const updated = exists
+                ? prev.map(item => item.id === payload.new.id ? payload.new : item)
+                : [...prev, payload.new];
+              return updated.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+            });
+          } else if (payload.eventType === 'DELETE') {
+            setAccountRequests(prev => prev.filter(item => item.id !== payload.old.id));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sponsor_commitments' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            setSponsorCommitments(prev => {
+              const exists = prev.some(item => item.id === payload.new.id);
+              const updated = exists
+                ? prev.map(item => item.id === payload.new.id ? (payload.new as SponsorCommitment) : item)
+                : [...prev, payload.new as SponsorCommitment];
+              return updated.sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''));
+            });
+          } else if (payload.eventType === 'DELETE') {
+            setSponsorCommitments(prev => prev.filter(item => item.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isSupabaseActive]);
 
   // RBAC Visibility Logic
   const visibleNodes = nodes.filter(node => {
@@ -429,21 +636,24 @@ export default function App() {
       ...commitment,
       id: `commit-${Date.now()}`
     };
-    const updated = [...sponsorCommitments, newCommitment];
-    setSponsorCommitments(updated);
-    localStorage.setItem('cardinal_sponsor_commitments', JSON.stringify(updated));
+    setSponsorCommitments(prev => [...prev, newCommitment].sort((a, b) => (a.due_date || '').localeCompare(b.due_date || '')));
+    supabaseService.upsertSponsorCommitment(newCommitment).catch(console.error);
   };
 
   const handleUpdateSponsorCommitmentStatus = (id: string, status: SponsorCommitment['status']) => {
-    const updated = sponsorCommitments.map(c => c.id === id ? { ...c, status } : c);
-    setSponsorCommitments(updated);
-    localStorage.setItem('cardinal_sponsor_commitments', JSON.stringify(updated));
+    setSponsorCommitments(prev => prev.map(c => {
+      if (c.id === id) {
+        const updated = { ...c, status };
+        supabaseService.upsertSponsorCommitment(updated).catch(console.error);
+        return updated;
+      }
+      return c;
+    }));
   };
 
   const handleDeleteSponsorCommitment = (id: string) => {
-    const updated = sponsorCommitments.filter(c => c.id !== id);
-    setSponsorCommitments(updated);
-    localStorage.setItem('cardinal_sponsor_commitments', JSON.stringify(updated));
+    setSponsorCommitments(prev => prev.filter(c => c.id !== id));
+    supabaseService.deleteSponsorCommitment(id).catch(console.error);
   };
 
   // NEWS & REPORTS HANDLERS & AUTOMATED EMAILS
@@ -538,14 +748,31 @@ Cardinal Overture F1 in Schools Team
   };
 
   // AUTHORIZED USERS ACCESS HANDLERS
-  const handleAddAuthorizedUser = (userData: Omit<AuthorizedUser, 'id'>) => {
+  const handleAddAuthorizedUser = async (userData: Omit<AuthorizedUser, 'id'>) => {
     const newId = `AUTH-${Date.now()}`;
     const newUser: AuthorizedUser = {
       id: newId,
       ...userData
     };
-    setAuthorizedUsers(prev => [newUser, ...prev]);
-    supabaseService.upsertAuthorizedUser(newUser).catch(console.error);
+    
+    // Optimistic UI update
+    setAuthorizedUsers(prev => [newUser, ...prev].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')));
+    
+    try {
+      await supabaseService.upsertAuthorizedUser(newUser);
+      
+      // If Supabase is active, register them in Supabase Auth
+      if (isSupabaseActive && userData.password) {
+        await supabaseService.signUpUser(
+          userData.email,
+          userData.role,
+          userData.password,
+          userData.notes || userData.email.split('@')[0]
+        );
+      }
+    } catch (err) {
+      console.error('Error adding authorized user and signing up:', err);
+    }
 
     // Auto-clean any matching pending registration requests
     const matchingReq = accountRequests.find(r => r.email.toLowerCase().trim() === userData.email.toLowerCase().trim());
@@ -557,6 +784,22 @@ Cardinal Overture F1 in Schools Team
   const handleDeleteAuthorizedUser = (id: string) => {
     setAuthorizedUsers(prev => prev.filter(u => u.id !== id));
     supabaseService.deleteAuthorizedUser(id).catch(console.error);
+  };
+
+  const handleUpdateAuthorizedUser = async (updatedUser: AuthorizedUser) => {
+    setAuthorizedUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+
+    if (user && user.email?.toLowerCase().trim() === updatedUser.email.toLowerCase().trim()) {
+      if (updatedUser.is_greenlit === false) {
+        signOut();
+      }
+    }
+
+    try {
+      await supabaseService.upsertAuthorizedUser(updatedUser);
+    } catch (err) {
+      console.error('Error updating authorized user:', err);
+    }
   };
 
   const handleCreateAccountRequest = async (email: string, notes: string) => {
@@ -692,6 +935,7 @@ Cardinal Overture F1 in Schools Team
             authorizedUsers={authorizedUsers}
             onAddAuthorizedUser={handleAddAuthorizedUser}
             onDeleteAuthorizedUser={handleDeleteAuthorizedUser}
+            onUpdateAuthorizedUser={handleUpdateAuthorizedUser}
             accountRequests={accountRequests}
             onDeleteAccountRequest={handleDeleteAccountRequest}
           />

@@ -51,17 +51,78 @@ export function AuthGate({ children }: AuthGateProps) {
     }
 
     // Get current session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!localStorage.getItem('cardinal_custom_session')) {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!localStorage.getItem('cardinal_custom_session') && session?.user) {
+        try {
+          const emailLower = session.user.email?.toLowerCase().trim();
+          const { data: authUsers, error: authErr } = await supabase
+            .from('authorized_users')
+            .select('*')
+            .eq('email', emailLower);
+
+          if (!authErr && authUsers && authUsers.length > 0) {
+            const matchedUser = authUsers[0];
+            if (matchedUser.is_greenlit === false) {
+              await supabase.auth.signOut().catch(() => {});
+              setUser(null);
+            } else {
+              setUser({
+                ...session.user,
+                user_metadata: {
+                  ...session.user.user_metadata,
+                  role: matchedUser.role,
+                  name: matchedUser.notes || session.user.email?.split('@')[0],
+                }
+              });
+            }
+          } else {
+            await supabase.auth.signOut().catch(() => {});
+            setUser(null);
+          }
+        } catch (err) {
+          console.error('Error verifying restored session:', err);
+          setUser(session.user);
+        }
+      } else if (!localStorage.getItem('cardinal_custom_session')) {
         setUser(session?.user ?? null);
       }
       setLoading(false);
     });
 
     // Listen to auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!localStorage.getItem('cardinal_custom_session')) {
-        setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!localStorage.getItem('cardinal_custom_session') && session?.user) {
+        try {
+          const emailLower = session.user.email?.toLowerCase().trim();
+          const { data: authUsers, error: authErr } = await supabase
+            .from('authorized_users')
+            .select('*')
+            .eq('email', emailLower);
+
+          if (!authErr && authUsers && authUsers.length > 0) {
+            const matchedUser = authUsers[0];
+            if (matchedUser.is_greenlit === false) {
+              await supabase.auth.signOut().catch(() => {});
+              setUser(null);
+            } else {
+              setUser({
+                ...session.user,
+                user_metadata: {
+                  ...session.user.user_metadata,
+                  role: matchedUser.role,
+                  name: matchedUser.notes || session.user.email?.split('@')[0],
+                }
+              });
+            }
+          } else {
+            await supabase.auth.signOut().catch(() => {});
+            setUser(null);
+          }
+        } catch (err) {
+          setUser(session.user);
+        }
+      } else if (!localStorage.getItem('cardinal_custom_session') && !session) {
+        setUser(null);
       }
       setLoading(false);
     });
@@ -118,11 +179,12 @@ export function AuthGate({ children }: AuthGateProps) {
         // Strict verification of pre-authorization if registering
         const { data: authUsers, error: fetchErr } = await supabase
           .from('authorized_users')
-          .select('*');
+          .select('*')
+          .eq('email', emailLower);
         
         let matchedUser = null;
-        if (!fetchErr && authUsers) {
-          matchedUser = authUsers.find((au: any) => au.email.toLowerCase().trim() === emailLower);
+        if (!fetchErr && authUsers && authUsers.length > 0) {
+          matchedUser = authUsers[0];
         }
 
         if (!matchedUser) {
@@ -146,7 +208,14 @@ export function AuthGate({ children }: AuthGateProps) {
           setInfoMsg('Verification email sent! Please check your inbox before logging in.');
           setIsSignUp(false);
         } else if (data.session) {
-          setUser(data.user);
+          setUser({
+            ...data.user,
+            user_metadata: {
+              ...data.user.user_metadata,
+              role: matchedUser.role,
+              name: matchedUser.notes || email.split('@')[0],
+            }
+          });
         }
       } else {
         // 1. Try Authenticating with Admin-Created Direct Credentials
@@ -159,6 +228,9 @@ export function AuthGate({ children }: AuthGateProps) {
           if (!fetchErr && authUsers && authUsers.length > 0) {
             const matchedUser = authUsers[0];
             if (matchedUser.password && matchedUser.password === password) {
+              if (matchedUser.is_greenlit === false) {
+                throw new Error('ACCESS DENIED: Your account is currently dormant. Awaiting administrator greenlight.');
+              }
               const customSession = {
                 id: matchedUser.id,
                 email: matchedUser.email,
@@ -174,7 +246,10 @@ export function AuthGate({ children }: AuthGateProps) {
               return;
             }
           }
-        } catch (dbErr) {
+        } catch (dbErr: any) {
+          if (dbErr.message && dbErr.message.includes('ACCESS DENIED')) {
+            throw dbErr;
+          }
           console.warn('Direct credentials check bypassed, checking main database:', dbErr);
         }
 
@@ -188,7 +263,31 @@ export function AuthGate({ children }: AuthGateProps) {
           throw new Error('Authentication failed. Check your password, or contact an administrator to create your account.');
         }
 
-        setUser(data.user);
+        // Verify authorization status
+        const { data: authUsers, error: authErr } = await supabase
+          .from('authorized_users')
+          .select('*')
+          .eq('email', emailLower);
+
+        if (authErr || !authUsers || authUsers.length === 0) {
+          await supabase.auth.signOut().catch(() => {});
+          throw new Error(`ACCESS DENIED: "${email}" is not authorized. Please contact the Team Administrator.`);
+        }
+
+        const matchedUser = authUsers[0];
+        if (matchedUser.is_greenlit === false) {
+          await supabase.auth.signOut().catch(() => {});
+          throw new Error('ACCESS DENIED: Your account is currently dormant. Awaiting administrator greenlight.');
+        }
+
+        setUser({
+          ...data.user,
+          user_metadata: {
+            ...data.user.user_metadata,
+            role: matchedUser.role,
+            name: matchedUser.notes || data.user.email?.split('@')[0],
+          }
+        });
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'An error occurred during authentication.');
@@ -298,35 +397,21 @@ export function AuthGate({ children }: AuthGateProps) {
                 </motion.div>
               )}
 
-              {/* SIGNUP ONLY: Display Name and Role */}
-              {isSignUp && (
-                <>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-mono tracking-wider text-zinc-500 uppercase block">DISPLAY NAME</label>
-                      <input
-                        type="text"
-                        required={isSignUp}
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        placeholder="e.g. John Doe / sponsor-name"
-                        className="w-full bg-black border border-zinc-900 rounded px-3 py-2 text-xs font-mono text-zinc-200 placeholder-zinc-800 focus:outline-none focus:border-zinc-800 transition-colors"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[9px] font-mono tracking-wider text-zinc-500 uppercase block">ACCESS PROFILE</label>
-                      <select
-                        value={role}
-                        onChange={(e) => setRole(e.target.value as any)}
-                        className="w-full bg-black border border-zinc-900 rounded px-3 py-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-800 transition-colors"
-                      >
-                        <option value="Team">Team Member</option>
-                        <option value="Sponsor">Sponsor / Partner</option>
-                        <option value="Judge">Judge / Evaluator</option>
-                      </select>
-                    </div>
-                  </div>
-                </>
+              {/* Toggle Sign Up / Sign In link */}
+              {isSupabaseConfigured && (
+                <div className="text-center pb-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSignUp(!isSignUp);
+                      setErrorMsg(null);
+                      setInfoMsg(null);
+                    }}
+                    className="text-[10px] font-mono text-zinc-400 hover:text-white uppercase tracking-wider underline cursor-pointer"
+                  >
+                    {isSignUp ? "Already authorized? Sign In" : "Pre-authorized? Register Account"}
+                  </button>
+                </div>
               )}
 
               {/* Email Input */}
@@ -384,10 +469,17 @@ export function AuthGate({ children }: AuthGateProps) {
                 className="w-full h-10 mt-2 bg-zinc-100 hover:bg-white text-black font-mono text-xs font-bold uppercase tracking-widest rounded flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
               >
                 {formLoading ? 'AUTHORIZING_...' : (
-                  <>
-                    AUTHENTICATE
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </>
+                  isSignUp ? (
+                    <>
+                      REGISTER CREDENTIALS
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </>
+                  ) : (
+                    <>
+                      AUTHENTICATE
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </>
+                  )
                 )}
               </button>
             </form>

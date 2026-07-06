@@ -117,6 +117,7 @@ CREATE POLICY "Authenticated Feedback Write" ON judge_feedback FOR ALL USING (au
 CREATE TABLE IF NOT EXISTS account_requests (
   id TEXT PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
+  notes TEXT,
   status TEXT DEFAULT 'Pending',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -128,6 +129,91 @@ DROP POLICY IF EXISTS "Authenticated request controls" ON account_requests;
 
 CREATE POLICY "Public request inserts" ON account_requests FOR INSERT WITH CHECK (true);
 CREATE POLICY "Authenticated request controls" ON account_requests FOR ALL USING (auth.role() = 'authenticated');
+
+-- 5. Authorized Users Table
+CREATE TABLE IF NOT EXISTS authorized_users (
+  id TEXT PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('Team', 'Sponsor', 'Judge')),
+  password TEXT NOT NULL,
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  is_greenlit BOOLEAN DEFAULT FALSE
+);
+
+ALTER TABLE authorized_users ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public Read Authorized" ON authorized_users;
+DROP POLICY IF EXISTS "Admin Write Authorized" ON authorized_users;
+CREATE POLICY "Public Read Authorized" ON authorized_users FOR SELECT USING (true);
+CREATE POLICY "Admin Write Authorized" ON authorized_users FOR ALL USING (auth.role() = 'authenticated');
+
+
+-- 6. Sponsor Commitments Table
+CREATE TABLE IF NOT EXISTS sponsor_commitments (
+  id TEXT PRIMARY KEY,
+  sponsor_email TEXT NOT NULL,
+  sponsor_name TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  due_date TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('In Queue', 'In Progress', 'Fulfilled')),
+  assigned_by TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE sponsor_commitments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public commitments read" ON sponsor_commitments;
+DROP POLICY IF EXISTS "Auth commitments write" ON sponsor_commitments;
+CREATE POLICY "Public commitments read" ON sponsor_commitments FOR SELECT USING (true);
+CREATE POLICY "Auth commitments write" ON sponsor_commitments FOR ALL USING (auth.role() = 'authenticated');
+
+-- 7. Nodes (Gantt Milestones) Table
+CREATE TABLE IF NOT EXISTS nodes (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  department TEXT NOT NULL,
+  status TEXT NOT NULL,
+  planned_start TEXT NOT NULL,
+  planned_end TEXT NOT NULL,
+  actual_start TEXT,
+  actual_end TEXT,
+  dependency TEXT
+);
+
+ALTER TABLE nodes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public nodes read" ON nodes;
+DROP POLICY IF EXISTS "Auth nodes write" ON nodes;
+CREATE POLICY "Public nodes read" ON nodes FOR SELECT USING (true);
+CREATE POLICY "Auth nodes write" ON nodes FOR ALL USING (auth.role() = 'authenticated');
+
+-- 8. CAD Iterations Table
+CREATE TABLE IF NOT EXISTS cad_iterations (
+  id TEXT PRIMARY KEY,
+  date TEXT NOT NULL,
+  cad_file_ref TEXT NOT NULL,
+  weight_grams NUMERIC NOT NULL,
+  drag_coefficient_cd NUMERIC NOT NULL,
+  status TEXT NOT NULL,
+  model_url TEXT,
+  model_name TEXT
+);
+
+ALTER TABLE cad_iterations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public iterations read" ON cad_iterations;
+DROP POLICY IF EXISTS "Auth iterations write" ON cad_iterations;
+CREATE POLICY "Public iterations read" ON cad_iterations FOR SELECT USING (true);
+CREATE POLICY "Auth iterations write" ON cad_iterations FOR ALL USING (auth.role() = 'authenticated');
+
+-- 9. Enable Realtime Replication
+ALTER PUBLICATION supabase_realtime ADD TABLE nodes;
+ALTER PUBLICATION supabase_realtime ADD TABLE cad_iterations;
+ALTER PUBLICATION supabase_realtime ADD TABLE expenditures;
+ALTER PUBLICATION supabase_realtime ADD TABLE news_updates;
+ALTER PUBLICATION supabase_realtime ADD TABLE judge_feedback;
+ALTER PUBLICATION supabase_realtime ADD TABLE authorized_users;
+ALTER PUBLICATION supabase_realtime ADD TABLE account_requests;
+ALTER PUBLICATION supabase_realtime ADD TABLE sponsor_commitments;
 `;
 
   const copyToClipboard = () => {
