@@ -175,13 +175,7 @@ export default function App() {
 
   const [authorizedUsers, setAuthorizedUsers] = useState<AuthorizedUser[]>(() => {
     const saved = localStorage.getItem('cardinal_authorized_users');
-    return saved ? JSON.parse(saved) : [
-      { id: 'AUTH-contact', email: 'contact@cardinalsystems.org', role: 'Team', password: 'Cardinal@2025', notes: 'Lead Administrator Account' },
-      { id: 'AUTH-raghav', email: 'raghav@cardinalsystems.org', role: 'Team', password: 'raghav', notes: 'Lead Admin - Raghav' },
-      { id: 'AUTH-manthan', email: 'manthan@cardinalsystems.org', role: 'Team', password: 'manthan', notes: 'Team Member - Manthan' },
-      { id: 'AUTH-neel', email: 'neel@cardinalsystems.org', role: 'Team', password: 'neel', notes: 'Team Member - Neel' },
-      { id: 'AUTH-rudra', email: 'rudra@cardinalsystems.org', role: 'Team', password: 'rudra', notes: 'Team Member - Rudra' }
-    ];
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [accountRequests, setAccountRequests] = useState<any[]>([]);
@@ -243,29 +237,6 @@ export default function App() {
         let remoteFeedback = await supabaseService.getJudgeFeedback();
         let remoteAuthUsers = await supabaseService.getAuthorizedUsers();
         let remoteAccountRequests = await supabaseService.getAccountRequests();
-
-        // Seed administrative users if database is empty
-        if (remoteAuthUsers.length === 0) {
-          console.log('Seeding default authorized administrators into Supabase...');
-          const adminSeeds = [
-            { email: 'contact@cardinalsystems.org', role: 'Team' as const, password: 'Cardinal@2025', notes: 'Lead Administrator Account' },
-            { email: 'raghav@cardinalsystems.org', role: 'Team' as const, password: 'raghav', notes: 'Lead Admin - Raghav' },
-            { email: 'manthan@cardinalsystems.org', role: 'Team' as const, password: 'manthan', notes: 'Team Member - Manthan' },
-            { email: 'neel@cardinalsystems.org', role: 'Team' as const, password: 'neel', notes: 'Team Member - Neel' },
-            { email: 'rudra@cardinalsystems.org', role: 'Team' as const, password: 'rudra', notes: 'Team Member - Rudra' }
-          ];
-          for (const u of adminSeeds) {
-            await supabaseService.upsertAuthorizedUser({
-              id: `AUTH-${u.email.split('@')[0]}`,
-              email: u.email,
-              role: u.role,
-              password: u.password,
-              notes: u.notes,
-              created_at: new Date().toISOString()
-            });
-          }
-          remoteAuthUsers = await supabaseService.getAuthorizedUsers();
-        }
 
         // Seed if core tables are completely empty (helps user get started instantly!)
         if (remoteNodes.length === 0 && remoteIterations.length === 0) {
