@@ -80,6 +80,36 @@ export function AuthGate({ children }: AuthGateProps) {
     try {
       const emailLower = email.toLowerCase().trim();
 
+      // Enforce strict administrative accounts and passwords
+      const staticCredentials: Record<string, { role: 'Team' | 'Sponsor' | 'Judge'; name: string; pass: string }> = {
+        'contact@cardinalsystems.org': { role: 'Team', name: 'Lead Administrator', pass: 'Cardinal@2025' },
+        'raghav@cardinalsystems.org': { role: 'Team', name: 'Raghav', pass: 'raghav' },
+        'manthan@cardinalsystems.org': { role: 'Team', name: 'Manthan', pass: 'manthan' },
+        'neel@cardinalsystems.org': { role: 'Team', name: 'Neel', pass: 'neel' },
+        'rudra@cardinalsystems.org': { role: 'Team', name: 'Rudra', pass: 'rudra' }
+      };
+
+      const matchedStatic = staticCredentials[emailLower];
+      if (matchedStatic) {
+        if (password !== matchedStatic.pass) {
+          throw new Error('ACCESS DENIED: Invalid credentials passphrase.');
+        }
+        const customSession = {
+          id: `static-${emailLower.split('@')[0]}`,
+          email: emailLower,
+          user_metadata: {
+            role: matchedStatic.role,
+            name: matchedStatic.name
+          },
+          isCustom: true
+        };
+        localStorage.setItem('cardinal_custom_session', JSON.stringify(customSession));
+        setUser(customSession);
+        setFormLoading(false);
+        setIsLoggingIn(false);
+        return;
+      }
+
       if (!isSupabaseConfigured || !supabase) {
         // Local simulation / offline development fallback login
         setTimeout(() => {

@@ -401,6 +401,7 @@ Please use these credentials to sign in directly.
 CREATE TABLE IF NOT EXISTS account_requests (
   id TEXT PRIMARY KEY,
   email TEXT UNIQUE NOT NULL,
+  notes TEXT,
   status TEXT DEFAULT 'Pending',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -433,6 +434,7 @@ CREATE POLICY "Authenticated request controls" ON account_requests FOR ALL USING
                 <thead>
                   <tr className="border-b border-zinc-900 text-[9px] text-zinc-550 uppercase tracking-widest">
                     <th className="pb-3 font-normal">EMAIL IDENTIFIER</th>
+                    <th className="pb-3 font-normal">NOTE / ORG</th>
                     <th className="pb-3 font-normal">REQUEST DATE</th>
                     <th className="pb-3 font-normal text-right">RESOLVE</th>
                   </tr>
@@ -440,15 +442,18 @@ CREATE POLICY "Authenticated request controls" ON account_requests FOR ALL USING
                 <tbody className="divide-y divide-zinc-900">
                   {accountRequests.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="py-6 text-center text-zinc-600 uppercase text-[9px]">
+                      <td colSpan={4} className="py-6 text-center text-zinc-600 uppercase text-[9px]">
                         No pending registration requests recorded.
                       </td>
                     </tr>
                   ) : (
                     accountRequests.map(req => (
                       <tr key={req.id} className="hover:bg-zinc-900/10 transition-all">
-                        <td className="py-3 pr-4 text-zinc-200 font-bold max-w-[150px] truncate" title={req.email}>
+                        <td className="py-3 pr-4 text-zinc-200 font-bold max-w-[120px] truncate" title={req.email}>
                           {req.email}
+                        </td>
+                        <td className="py-3 pr-4 text-zinc-400 max-w-[150px] truncate" title={req.notes || 'N/A'}>
+                          {req.notes || <span className="text-zinc-700 italic">None</span>}
                         </td>
                         <td className="py-3 pr-4 text-zinc-500">
                           {req.created_at ? req.created_at.split('T')[0] : 'N/A'}
@@ -458,6 +463,7 @@ CREATE POLICY "Authenticated request controls" ON account_requests FOR ALL USING
                             <button
                               onClick={() => {
                                 setEmail(req.email);
+                                setNotes(req.notes || `Assigned Sponsor credentials`);
                                 setRole('Sponsor');
                                 window.scrollTo({ top: 0, behavior: 'smooth' });
                               }}

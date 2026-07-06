@@ -367,7 +367,7 @@ export const supabaseService = {
     }
   },
 
-  async createAccountRequest(email: string): Promise<void> {
+  async createAccountRequest(email: string, notes: string): Promise<void> {
     if (!isSupabaseConfigured || !supabase) {
       const saved = localStorage.getItem('cardinal_account_requests');
       const list = saved ? JSON.parse(saved) : [];
@@ -375,6 +375,7 @@ export const supabaseService = {
         list.push({
           id: `mock-req-${Date.now()}`,
           email: email.toLowerCase().trim(),
+          notes: notes.trim(),
           status: 'Pending',
           created_at: new Date().toISOString().split('T')[0]
         });
@@ -388,6 +389,7 @@ export const supabaseService = {
         .upsert({
           id: `REQ-${Date.now()}`,
           email: email.toLowerCase().trim(),
+          notes: notes.trim(),
           status: 'Pending',
           created_at: new Date().toISOString()
         });

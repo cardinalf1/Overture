@@ -13,7 +13,7 @@ interface PublicWelcomeProps {
   expenditures: ExpenditureItem[];
   simulatedDate: string;
   activeCadIteration: CadIteration | null;
-  onRequestAccount: (email: string) => Promise<void>;
+  onRequestAccount: (email: string, notes: string) => Promise<void>;
 }
 
 export function PublicWelcome({
@@ -24,6 +24,7 @@ export function PublicWelcome({
   onRequestAccount
 }: PublicWelcomeProps) {
   const [emailInput, setEmailInput] = useState('');
+  const [notesInput, setNotesInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
@@ -43,9 +44,10 @@ export function PublicWelcome({
     setSuccessMsg('');
 
     try {
-      await onRequestAccount(emailInput.trim());
+      await onRequestAccount(emailInput.trim(), notesInput.trim());
       setSuccessMsg('✔ Request logged! The Team Administrator will email your credentials.');
       setEmailInput('');
+      setNotesInput('');
       setTimeout(() => setSuccessMsg(''), 5000);
     } catch (err) {
       alert('Failed to submit request. Please try again.');
@@ -114,7 +116,7 @@ export function PublicWelcome({
                         </span>
                       </td>
                       <td className="py-3.5 pr-4 text-zinc-300 font-bold">
-                        ${item.cost.toFixed(2)}
+                        ₹{item.cost.toFixed(2)}
                       </td>
                       <td className="py-3.5 pr-4 text-zinc-500">
                         {item.needed_by}
@@ -147,15 +149,15 @@ export function PublicWelcome({
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-black/55 border border-zinc-900 p-3 rounded text-center">
                 <span className="text-[8px] font-mono text-zinc-500 block uppercase">GOAL</span>
-                <span className="text-xs font-mono text-zinc-200 font-bold">${totalBudgetNeeded.toFixed(0)}</span>
+                <span className="text-xs font-mono text-zinc-200 font-bold">₹{totalBudgetNeeded.toFixed(0)}</span>
               </div>
               <div className="bg-black/55 border border-emerald-950/40 p-3 rounded text-center">
                 <span className="text-[8px] font-mono text-emerald-500 block uppercase">PLEDGED</span>
-                <span className="text-xs font-mono text-emerald-400 font-bold">${totalBudgetPledged.toFixed(0)}</span>
+                <span className="text-xs font-mono text-emerald-400 font-bold">₹{totalBudgetPledged.toFixed(0)}</span>
               </div>
               <div className="bg-zinc-900/10 border border-dashed border-zinc-800 p-3 rounded text-center">
                 <span className="text-[8px] font-mono text-zinc-400 block uppercase">GAP</span>
-                <span className="text-xs font-mono text-zinc-400 font-bold">${totalBudgetRemaining.toFixed(0)}</span>
+                <span className="text-xs font-mono text-zinc-400 font-bold">₹{totalBudgetRemaining.toFixed(0)}</span>
               </div>
             </div>
 
@@ -198,6 +200,17 @@ export function PublicWelcome({
                     className="w-full bg-black border border-zinc-900 rounded pl-9 pr-3 py-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-800"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] text-zinc-500 uppercase block font-bold">Note / Organization</label>
+                <textarea
+                  value={notesInput}
+                  onChange={(e) => setNotesInput(e.target.value)}
+                  placeholder="e.g. Sponsor inquiry from Acme Corp, looking to back Materials"
+                  rows={2}
+                  className="w-full bg-black border border-zinc-900 rounded p-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-800 resize-none placeholder-zinc-800"
+                />
               </div>
 
               {successMsg && (

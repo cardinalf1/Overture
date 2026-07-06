@@ -128,7 +128,7 @@ export function PartnerPortal({
 
   const copySponsorPledgeEmail = () => {
     const total = sponsorPledges.reduce((sum, item) => sum + item.cost, 0);
-    const pledgeLines = sponsorPledges.map(item => ` - ${item.item_name} ($${item.cost.toFixed(2)}) [Needed by: ${item.needed_by}]`).join('\n');
+    const pledgeLines = sponsorPledges.map(item => ` - ${item.item_name} (₹${item.cost.toFixed(2)}) [Needed by: ${item.needed_by}]`).join('\n');
     
     const emailText = `Subject: Pledged Resources Confirmation - Cardinal Overture F1 in Schools
 
@@ -139,7 +139,7 @@ This is a formal confirmation of the resources you have generously pledged to ba
 PLEDGED ITEMS & ALLOCATED FUNDING:
 ${pledgeLines}
 
-TOTAL ALLOCATED CONTRIBUTION: $${total.toFixed(2)}
+TOTAL ALLOCATED CONTRIBUTION: ₹${total.toFixed(2)}
 
 Our engineering queue has marked these procurement items as "PLEDGED" and locked them from public bidding. We will reach out shortly with invoicing and routing instructions.
 
@@ -157,7 +157,7 @@ Cardinal Overture F1 in Schools Team`;
     const items = expenditures.filter(e => e.pledged_by_email === sponsorEmail && e.status === 'Pledged');
     if (items.length === 0) return;
     const total = items.reduce((sum, e) => sum + e.cost, 0);
-    const pledgeLines = items.map(item => ` - ${item.item_name} ($${item.cost.toFixed(2)}) [Needed by: ${item.needed_by}]`).join('\n');
+    const pledgeLines = items.map(item => ` - ${item.item_name} (₹${item.cost.toFixed(2)}) [Needed by: ${item.needed_by}]`).join('\n');
 
     const emailText = `Subject: Pledged Resources Confirmation - Cardinal Overture F1 in Schools
 
@@ -168,7 +168,7 @@ This is a formal confirmation of the resources you have generously pledged to ba
 PLEDGED ITEMS & ALLOCATED FUNDING:
 ${pledgeLines}
 
-TOTAL ALLOCATED CONTRIBUTION: $${total.toFixed(2)}
+TOTAL ALLOCATED CONTRIBUTION: ₹${total.toFixed(2)}
 
 Our engineering queue has marked these procurement items as "PLEDGED" and locked them from public bidding. We will reach out shortly with invoicing and routing instructions.
 
@@ -367,15 +367,15 @@ Cardinal Overture F1 in Schools Team`;
               <div className="grid grid-cols-3 gap-2">
                 <div className="bg-black/55 border border-zinc-900 p-3 rounded">
                   <span className="text-[8px] font-mono text-zinc-500 block">BUDGET GOAL</span>
-                  <span className="text-sm font-mono text-zinc-200 font-bold">${totalBudgetNeeded.toFixed(2)}</span>
+                  <span className="text-sm font-mono text-zinc-200 font-bold">₹{totalBudgetNeeded.toFixed(2)}</span>
                 </div>
                 <div className="bg-black/55 border border-emerald-950/40 p-3 rounded">
                   <span className="text-[8px] font-mono text-emerald-500 block">PLEDGED</span>
-                  <span className="text-sm font-mono text-emerald-400 font-bold">${totalBudgetPledged.toFixed(2)}</span>
+                  <span className="text-sm font-mono text-emerald-400 font-bold">₹{totalBudgetPledged.toFixed(2)}</span>
                 </div>
                 <div className="bg-zinc-900/10 border border-dashed border-zinc-800 p-3 rounded">
                   <span className="text-[8px] font-mono text-zinc-400 block">REMAINING</span>
-                  <span className="text-sm font-mono text-zinc-400 font-bold">${totalBudgetRemaining.toFixed(2)}</span>
+                  <span className="text-sm font-mono text-zinc-400 font-bold">₹{totalBudgetRemaining.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -430,7 +430,7 @@ Cardinal Overture F1 in Schools Team`;
                           <span className="text-[9px] text-zinc-500 uppercase">{item.category} // NEEDED BY {item.needed_by}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-emerald-400 font-bold">${item.cost.toFixed(2)}</span>
+                          <span className="text-emerald-400 font-bold">₹{item.cost.toFixed(2)}</span>
                           <button
                             onClick={() => onUnpledgeExpenditure(item.id)}
                             className="text-zinc-600 hover:text-rose-400 transition-colors"
@@ -444,7 +444,7 @@ Cardinal Overture F1 in Schools Team`;
                   </div>
                   <div className="pt-2 border-t border-zinc-900 flex justify-between text-[11px] font-mono">
                     <span className="text-zinc-500">TOTAL SUPPORT</span>
-                    <span className="text-emerald-400 font-bold">${sponsorPledges.reduce((sum, item) => sum + item.cost, 0).toFixed(2)}</span>
+                    <span className="text-emerald-400 font-bold">₹{sponsorPledges.reduce((sum, item) => sum + item.cost, 0).toFixed(2)}</span>
                   </div>
 
                   <button
@@ -459,9 +459,9 @@ Cardinal Overture F1 in Schools Team`;
                         setEmailSending(true);
                         setEmailStatusMsg(null);
                         const total = sponsorPledges.reduce((sum, item) => sum + item.cost, 0);
-                        const pledgeLines = sponsorPledges.map(item => ` - ${item.item_name} ($${item.cost.toFixed(2)}) [Needed by: ${item.needed_by}]`).join('\n');
+                        const pledgeLines = sponsorPledges.map(item => ` - ${item.item_name} (₹${item.cost.toFixed(2)}) [Needed by: ${item.needed_by}]`).join('\n');
                         
-                        const bodyText = `Dear ${currentSponsorName || 'Partner'},\n\nThis is a formal confirmation of the resources you have generously pledged to back for our F1 in Schools Campaign.\n\nPLEDGED ITEMS & ALLOCATED FUNDING:\n${pledgeLines}\n\nTOTAL ALLOCATED CONTRIBUTION: $${total.toFixed(2)}\n\nOur engineering queue has marked these procurement items as "PLEDGED" and locked them from public bidding. We will reach out shortly with invoicing and routing instructions.\n\nThank you once again for your vital support in accelerating our race to the world stage.\n\nBest regards,\nCardinal Overture F1 in Schools Team`;
+                        const bodyText = `Dear ${currentSponsorName || 'Partner'},\n\nThis is a formal confirmation of the resources you have generously pledged to back for our F1 in Schools Campaign.\n\nPLEDGED ITEMS & ALLOCATED FUNDING:\n${pledgeLines}\n\nTOTAL ALLOCATED CONTRIBUTION: ₹${total.toFixed(2)}\n\nOur engineering queue has marked these procurement items as "PLEDGED" and locked them from public bidding. We will reach out shortly with invoicing and routing instructions.\n\nThank you once again for your vital support in accelerating our race to the world stage.\n\nBest regards,\nCardinal Overture F1 in Schools Team`;
 
                         await sendEmail({
                           to: user?.email || '',
@@ -539,7 +539,7 @@ Cardinal Overture F1 in Schools Team`;
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] font-mono text-zinc-500 uppercase block">ESTIMATED COST ($)</label>
+                  <label className="text-[9px] font-mono text-zinc-500 uppercase block">ESTIMATED COST (₹)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -622,7 +622,7 @@ Cardinal Overture F1 in Schools Team`;
                           </span>
                         </td>
                         <td className="py-4 pr-4 text-zinc-200 font-bold font-mono">
-                          ${item.cost.toFixed(2)}
+                          ₹{item.cost.toFixed(2)}
                         </td>
                         <td className="py-4 pr-4 text-zinc-400">
                           {item.needed_by}
@@ -731,7 +731,7 @@ Cardinal Overture F1 in Schools Team`;
                               <span className="text-[9px] text-zinc-500 uppercase">{sponsorEmail} // {sponsorItems.length} Pledges</span>
                             </div>
                             <div className="flex items-center gap-3">
-                              <span className="text-emerald-400 font-bold">${totalCost.toFixed(2)}</span>
+                              <span className="text-emerald-400 font-bold">₹{totalCost.toFixed(2)}</span>
                               <button
                                 onClick={() => handleCopyEmailForSponsor(sponsorEmail, sponsorName)}
                                 className="text-[10px] font-mono text-zinc-400 hover:text-white px-2 py-1 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded flex items-center gap-1 transition-all"
@@ -757,9 +757,9 @@ Cardinal Overture F1 in Schools Team`;
                                     
                                     const items = expenditures.filter(e => e.pledged_by_email === sponsorEmail && e.status === 'Pledged');
                                     const total = items.reduce((sum, e) => sum + e.cost, 0);
-                                    const pledgeLines = items.map(item => ` - ${item.item_name} ($${item.cost.toFixed(2)}) [Needed by: ${item.needed_by}]`).join('\n');
+                                    const pledgeLines = items.map(item => ` - ${item.item_name} (₹${item.cost.toFixed(2)}) [Needed by: ${item.needed_by}]`).join('\n');
                                     
-                                    const bodyText = `Dear ${sponsorName},\n\nThis is a formal confirmation of the resources you have generously pledged to back for our F1 in Schools Campaign.\n\nPLEDGED ITEMS & ALLOCATED FUNDING:\n${pledgeLines}\n\nTOTAL ALLOCATED CONTRIBUTION: $${total.toFixed(2)}\n\nOur engineering queue has marked these procurement items as "PLEDGED" and locked them from public bidding. We will reach out shortly with invoicing and routing instructions.\n\nThank you once again for your vital support in accelerating our race to the world stage.\n\nBest regards,\nCardinal Overture F1 in Schools Team`;
+                                    const bodyText = `Dear ${sponsorName},\n\nThis is a formal confirmation of the resources you have generously pledged to back for our F1 in Schools Campaign.\n\nPLEDGED ITEMS & ALLOCATED FUNDING:\n${pledgeLines}\n\nTOTAL ALLOCATED CONTRIBUTION: ₹${total.toFixed(2)}\n\nOur engineering queue has marked these procurement items as "PLEDGED" and locked them from public bidding. We will reach out shortly with invoicing and routing instructions.\n\nThank you once again for your vital support in accelerating our race to the world stage.\n\nBest regards,\nCardinal Overture F1 in Schools Team`;
 
                                     await sendEmail({
                                       to: sponsorEmail,
@@ -948,7 +948,7 @@ Cardinal Overture F1 in Schools Team`;
                       return (
                         <div key={i} className="flex justify-between items-center text-[10px] uppercase">
                           <span className="text-zinc-300 font-bold">♥ {sponsorName}</span>
-                          <span className="text-emerald-400 font-bold">${totalPledgedByThisSponsor.toFixed(2)} pledged</span>
+                          <span className="text-emerald-400 font-bold">₹{totalPledgedByThisSponsor.toFixed(2)} pledged</span>
                         </div>
                       );
                     })}
