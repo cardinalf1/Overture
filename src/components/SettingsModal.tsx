@@ -167,30 +167,30 @@ DROP POLICY IF EXISTS "Authenticated request controls" ON account_requests;
 DROP POLICY IF EXISTS "Public commitments read" ON sponsor_commitments;
 DROP POLICY IF EXISTS "Auth commitments write" ON sponsor_commitments;
 
--- 4. Create security policies
+-- 4. Create security policies (Allowing writes from anon/custom credentials sessions)
 CREATE POLICY "Public Read Authorized" ON authorized_users FOR SELECT USING (true);
-CREATE POLICY "Admin Write Authorized" ON authorized_users FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Admin Write Authorized" ON authorized_users FOR ALL USING (true);
 
 CREATE POLICY "Public Read Nodes" ON nodes FOR SELECT USING (true);
-CREATE POLICY "Auth Write Nodes" ON nodes FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Auth Write Nodes" ON nodes FOR ALL USING (true);
 
 CREATE POLICY "Public Read Iterations" ON cad_iterations FOR SELECT USING (true);
-CREATE POLICY "Auth Write Iterations" ON cad_iterations FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Auth Write Iterations" ON cad_iterations FOR ALL USING (true);
 
 CREATE POLICY "Public Read Expenditures" ON expenditures FOR SELECT USING (true);
-CREATE POLICY "Auth Write Expenditures" ON expenditures FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Auth Write Expenditures" ON expenditures FOR ALL USING (true);
 
 CREATE POLICY "Public Read News" ON news_updates FOR SELECT USING (true);
-CREATE POLICY "Auth Write News" ON news_updates FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Auth Write News" ON news_updates FOR ALL USING (true);
 
 CREATE POLICY "Public Read Feedback" ON judge_feedback FOR SELECT USING (true);
-CREATE POLICY "Auth Write Feedback" ON judge_feedback FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Auth Write Feedback" ON judge_feedback FOR ALL USING (true);
 
 CREATE POLICY "Public request inserts" ON account_requests FOR INSERT WITH CHECK (true);
-CREATE POLICY "Authenticated request controls" ON account_requests FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Authenticated request controls" ON account_requests FOR ALL USING (true);
 
 CREATE POLICY "Public commitments read" ON sponsor_commitments FOR SELECT USING (true);
-CREATE POLICY "Auth commitments write" ON sponsor_commitments FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Auth commitments write" ON sponsor_commitments FOR ALL USING (true);
 
 -- 5. Seed Administrative Accounts securely inside the database (overrides/updates if they exist)
 INSERT INTO authorized_users (id, email, role, password, notes, is_greenlit)
