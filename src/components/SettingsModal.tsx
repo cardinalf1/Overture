@@ -50,9 +50,9 @@ export function SettingsModal({
     }
   };
 
-  const sqlScript = `-- UPGRADE PATH (Run if tables already exist):
--- ALTER TABLE authorized_users ADD COLUMN IF NOT EXISTS is_greenlit BOOLEAN DEFAULT FALSE;
--- UPDATE authorized_users SET is_greenlit = TRUE WHERE email LIKE '%@cardinalsystems.org';
+  const sqlScript = `-- UPGRADE PATH (Updates existing tables if they exist):
+ALTER TABLE authorized_users ADD COLUMN IF NOT EXISTS is_greenlit BOOLEAN DEFAULT FALSE;
+UPDATE authorized_users SET is_greenlit = TRUE WHERE email LIKE '%@cardinalsystems.org';
 
 -- 1. Create Tables (If Not Exist)
 CREATE TABLE IF NOT EXISTS authorized_users (
