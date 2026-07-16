@@ -562,6 +562,11 @@ export default function App() {
     }));
   };
 
+  const handleEditTodo = (id: string, updatedTodo: Node) => {
+    setNodes(prev => prev.map(n => n.id === id ? updatedTodo : n));
+    supabaseService.upsertNode(updatedTodo).catch(console.error);
+  };
+
   // EXPENDITURE HANDLERS
   const handleAddExpenditure = (itemData: Omit<ExpenditureItem, 'id' | 'pledged_by_email' | 'pledged_by_name'>) => {
     const newId = `EXP-${String(expenditures.length + 1).padStart(3, '0')}`;
@@ -918,6 +923,7 @@ Cardinal Overture F1 in Schools Team
             onUpdateStatus={handleUpdateStatus}
             onDeleteTodo={handleDeleteNode}
             onAssignTodo={handleAssignTodo}
+            onEditTodo={handleEditTodo}
           />
         )}
 
