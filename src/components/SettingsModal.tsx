@@ -75,7 +75,8 @@ CREATE TABLE IF NOT EXISTS nodes (
   planned_end DATE NOT NULL,
   actual_start DATE,
   actual_end DATE,
-  dependency TEXT
+  dependency TEXT,
+  assigned_to TEXT
 );
 
 CREATE TABLE IF NOT EXISTS cad_iterations (
@@ -83,10 +84,12 @@ CREATE TABLE IF NOT EXISTS cad_iterations (
   date TEXT NOT NULL,
   cad_file_ref TEXT NOT NULL,
   weight_grams NUMERIC NOT NULL,
-  drag_coefficient_cd NUMERIC NOT NULL,
+  drag_coefficient_cd NUMERIC,
   status TEXT NOT NULL,
   model_url TEXT,
-  model_name TEXT
+  model_name TEXT,
+  description TEXT,
+  part_name TEXT
 );
 
 CREATE TABLE IF NOT EXISTS expenditures (
@@ -107,16 +110,6 @@ CREATE TABLE IF NOT EXISTS news_updates (
   content TEXT NOT NULL,
   created_at TEXT NOT NULL,
   author TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS judge_feedback (
-  id TEXT PRIMARY KEY,
-  judge_email TEXT NOT NULL,
-  judge_name TEXT NOT NULL,
-  category TEXT NOT NULL,
-  score INTEGER NOT NULL,
-  comments TEXT NOT NULL,
-  created_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS account_requests (
@@ -145,7 +138,6 @@ ALTER TABLE nodes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cad_iterations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenditures ENABLE ROW LEVEL SECURITY;
 ALTER TABLE news_updates ENABLE ROW LEVEL SECURITY;
-ALTER TABLE judge_feedback ENABLE ROW LEVEL SECURITY;
 ALTER TABLE account_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sponsor_commitments ENABLE ROW LEVEL SECURITY;
 
@@ -160,8 +152,6 @@ DROP POLICY IF EXISTS "Public Read Expenditures" ON expenditures;
 DROP POLICY IF EXISTS "Auth Write Expenditures" ON expenditures;
 DROP POLICY IF EXISTS "Public Read News" ON news_updates;
 DROP POLICY IF EXISTS "Auth Write News" ON news_updates;
-DROP POLICY IF EXISTS "Public Read Feedback" ON judge_feedback;
-DROP POLICY IF EXISTS "Auth Write Feedback" ON judge_feedback;
 DROP POLICY IF EXISTS "Public request inserts" ON account_requests;
 DROP POLICY IF EXISTS "Authenticated request controls" ON account_requests;
 DROP POLICY IF EXISTS "Public commitments read" ON sponsor_commitments;
@@ -182,9 +172,6 @@ CREATE POLICY "Auth Write Expenditures" ON expenditures FOR ALL USING (true);
 
 CREATE POLICY "Public Read News" ON news_updates FOR SELECT USING (true);
 CREATE POLICY "Auth Write News" ON news_updates FOR ALL USING (true);
-
-CREATE POLICY "Public Read Feedback" ON judge_feedback FOR SELECT USING (true);
-CREATE POLICY "Auth Write Feedback" ON judge_feedback FOR ALL USING (true);
 
 CREATE POLICY "Public request inserts" ON account_requests FOR INSERT WITH CHECK (true);
 CREATE POLICY "Authenticated request controls" ON account_requests FOR ALL USING (true);
@@ -208,7 +195,6 @@ ALTER PUBLICATION supabase_realtime ADD TABLE nodes;
 ALTER PUBLICATION supabase_realtime ADD TABLE cad_iterations;
 ALTER PUBLICATION supabase_realtime ADD TABLE expenditures;
 ALTER PUBLICATION supabase_realtime ADD TABLE news_updates;
-ALTER PUBLICATION supabase_realtime ADD TABLE judge_feedback;
 ALTER PUBLICATION supabase_realtime ADD TABLE authorized_users;
 ALTER PUBLICATION supabase_realtime ADD TABLE account_requests;
 ALTER PUBLICATION supabase_realtime ADD TABLE sponsor_commitments;
@@ -269,7 +255,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE sponsor_commitments;
             {showSql && (
               <div className="space-y-3">
                 <p className="text-[10px] font-mono text-zinc-400 uppercase leading-relaxed">
-                  To host private dashboards on Supabase and enable sponsorship pledges & judge scores, run the following SQL schema inside your Supabase SQL Editor:
+                  To host private dashboards on Supabase and enable sponsorship pledges & team tasks/To-Dos, run the following SQL schema inside your Supabase SQL Editor:
                 </p>
                 <div className="relative">
                   <pre className="bg-black border border-zinc-900 rounded p-4 text-[9px] font-mono text-zinc-400 max-h-48 overflow-y-auto overflow-x-auto whitespace-pre leading-relaxed uppercase">

@@ -17,8 +17,8 @@ const DEPT_COLORS: Record<Department, string> = {
 export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const DAY_WIDTH = 40;
-  const ROW_HEIGHT = 48;
+  const DAY_WIDTH = 54;
+  const ROW_HEIGHT = 64;
   const HEADER_HEIGHT = 40;
   const LEFT_PANEL_WIDTH = 80;
   const DEPT_HEADER_HEIGHT = 24;
@@ -107,7 +107,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
 
           {/* Left Panel ID */}
           <rect x={0} y={currentY} width={LEFT_PANEL_WIDTH} height={ROW_HEIGHT} fill="#000000" />
-          <text x={10} y={currentY + 28} fill="#71717a" fontSize="10" fontFamily="monospace">{node.id}</text>
+          <text x={10} y={currentY + 36} fill="#71717a" fontSize="10" fontFamily="monospace">{node.id}</text>
           <line x1={LEFT_PANEL_WIDTH} y1={currentY} x2={LEFT_PANEL_WIDTH} y2={currentY + ROW_HEIGHT} stroke="#27272a" strokeWidth="1" />
 
           {/* Task Name (Always above bars, anchored to planned start) */}
@@ -125,11 +125,11 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
           {/* Planned Bar */}
           <rect
             x={plannedX}
-            y={currentY + 24}
+            y={currentY + 26}
             width={plannedW}
-            height={6}
+            height={8}
             fill="#27272a"
-            rx="3"
+            rx="4"
           />
 
           {/* Actual Bar */}
@@ -137,17 +137,17 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             <g>
               <rect
                 x={actualX}
-                y={currentY + 32}
+                y={currentY + 38}
                 width={actualW}
-                height={12}
+                height={18}
                 fill={bgColor}
-                rx="4"
+                rx="5"
               />
               <text
-                x={actualX + 4}
-                y={currentY + 41}
+                x={actualX + 6}
+                y={currentY + 50}
                 fill={textColor}
-                fontSize="8"
+                fontSize="9"
                 fontFamily="monospace"
                 fontWeight="bold"
               >

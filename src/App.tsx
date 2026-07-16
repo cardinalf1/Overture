@@ -7,11 +7,11 @@ import { NewNodeModal } from './components/NewNodeModal';
 import { EngineeringHub } from './components/EngineeringHub';
 import { SettingsModal } from './components/SettingsModal';
 import { PartnerPortal } from './components/PartnerPortal';
-import { JudgePortal } from './components/JudgePortal';
+import { TeamTodos } from './components/TeamTodos';
 import { AccessControlPanel } from './components/AccessControlPanel';
 import { initialNodes } from './data/mockNodes';
 import { initialIterations } from './data/mockIterations';
-import { Role, Status, Node, Department, CadIteration, ExpenditureItem, NewsUpdate, JudgeFeedback, AuthorizedUser, SponsorCommitment } from './types';
+import { Role, Status, Node, Department, CadIteration, ExpenditureItem, NewsUpdate, AuthorizedUser, SponsorCommitment } from './types';
 import { exportSystemData, importSystemData } from './utils/csv';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { supabaseService } from './lib/supabaseService';
@@ -90,17 +90,7 @@ const defaultNews: NewsUpdate[] = [
   }
 ];
 
-const defaultFeedbacks: JudgeFeedback[] = [
-  {
-    id: "J-001",
-    judge_name: "Lead Scrutineer",
-    judge_email: "scrutineer@f1inschools.com",
-    category: "Engineering Design & CAD",
-    score: 9,
-    comments: "EXTREMELY IMPRESSIVE CHASSIS COMPLIANCE. VERTEX COHERENCE IN THE CAD FILE IS PERFECT. AIRFOIL SLOPE CONFORMS FULLY TO THE 2026 RADIUS SPECIFICATION.",
-    created_at: "2026-07-02"
-  }
-];
+
 
 export default function App() {
   const { isSupabaseActive, role: authRole, user, name: authName, signOut } = useAuth();
@@ -173,10 +163,7 @@ export default function App() {
     return saved ? JSON.parse(saved) : defaultNews;
   });
 
-  const [judgeFeedbacks, setJudgeFeedbacks] = useState<JudgeFeedback[]>(() => {
-    const saved = localStorage.getItem('cardinal_feedback');
-    return saved ? JSON.parse(saved) : defaultFeedbacks;
-  });
+
 
   const [authorizedUsers, setAuthorizedUsers] = useState<AuthorizedUser[]>(() => {
     const saved = localStorage.getItem('cardinal_authorized_users');
@@ -239,7 +226,6 @@ export default function App() {
         let remoteIterations = await supabaseService.getIterations();
         let remoteExpenditures = await supabaseService.getExpenditures();
         let remoteNews = await supabaseService.getNewsUpdates();
-        let remoteFeedback = await supabaseService.getJudgeFeedback();
         let remoteAuthUsers = await supabaseService.getAuthorizedUsers();
         let remoteAccountRequests = await supabaseService.getAccountRequests();
         let remoteSponsorCommitments = await supabaseService.getSponsorCommitments();
@@ -259,14 +245,10 @@ export default function App() {
           for (const newsItem of defaultNews) {
             await supabaseService.upsertNewsUpdate(newsItem);
           }
-          for (const fed of defaultFeedbacks) {
-            await supabaseService.upsertJudgeFeedback(fed);
-          }
           remoteNodes = await supabaseService.getNodes();
           remoteIterations = await supabaseService.getIterations();
           remoteExpenditures = await supabaseService.getExpenditures();
           remoteNews = await supabaseService.getNewsUpdates();
-          remoteFeedback = await supabaseService.getJudgeFeedback();
           remoteAuthUsers = await supabaseService.getAuthorizedUsers();
         }
 
@@ -305,7 +287,7 @@ export default function App() {
         if (remoteIterations.length > 0) setIterations(remoteIterations);
         if (remoteExpenditures.length > 0) setExpenditures(remoteExpenditures);
         if (remoteNews.length > 0) setNewsUpdates(remoteNews);
-        if (remoteFeedback.length > 0) setJudgeFeedbacks(remoteFeedback);
+
         if (remoteAuthUsers.length > 0) setAuthorizedUsers(remoteAuthUsers);
         if (remoteSponsorCommitments.length > 0) setSponsorCommitments(remoteSponsorCommitments);
         if (remoteAccountRequests.length > 0) {
@@ -340,9 +322,7 @@ export default function App() {
     localStorage.setItem('cardinal_news', JSON.stringify(newsUpdates));
   }, [newsUpdates]);
 
-  useEffect(() => {
-    localStorage.setItem('cardinal_feedback', JSON.stringify(judgeFeedbacks));
-  }, [judgeFeedbacks]);
+
 
   useEffect(() => {
     localStorage.setItem('cardinal_authorized_users', JSON.stringify(authorizedUsers));
@@ -422,23 +402,7 @@ export default function App() {
           }
         }
       )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'judge_feedback' },
-        (payload) => {
-          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            setJudgeFeedbacks(prev => {
-              const exists = prev.some(item => item.id === payload.new.id);
-              const updated = exists
-                ? prev.map(item => item.id === payload.new.id ? (payload.new as JudgeFeedback) : item)
-                : [...prev, payload.new as JudgeFeedback];
-              return updated.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
-            });
-          } else if (payload.eventType === 'DELETE') {
-            setJudgeFeedbacks(prev => prev.filter(item => item.id !== payload.old.id));
-          }
-        }
-      )
+
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'authorized_users' },
@@ -564,9 +528,7 @@ export default function App() {
     supabaseService.deleteNode(id).catch(console.error);
   };
 
-  const handleCreateNode = (nodeData: { title: string; description: string; department: Department; planned_start: string; planned_end: string }) => {
-    if (currentRole !== 'PM') return;
-    
+  const handleCreateNode = (nodeData: { title: string; description: string; department: Department; planned_start: string; planned_end: string; dependency?: string; assigned_to?: string | null }) => {
     const maxIdNum = nodes.reduce((max, node) => {
       const match = node.id.match(/^(?:ND|N)-(\d+)$/);
       if (match) {
@@ -587,6 +549,17 @@ export default function App() {
     
     setNodes(prev => [...prev, newNode]);
     supabaseService.upsertNode(newNode).catch(console.error);
+  };
+
+  const handleAssignTodo = (id: string, assignedTo: string | null) => {
+    setNodes(prev => prev.map(n => {
+      if (n.id === id) {
+        const updated = { ...n, assigned_to: assignedTo };
+        supabaseService.upsertNode(updated).catch(console.error);
+        return updated;
+      }
+      return n;
+    }));
   };
 
   // EXPENDITURE HANDLERS
@@ -727,24 +700,32 @@ Cardinal Overture F1 in Schools Team
     supabaseService.deleteNewsUpdate(id).catch(console.error);
   };
 
-  // JUDGE FEEDBACK HANDLERS
-  const handleAddJudgeFeedback = (feedData: Omit<JudgeFeedback, 'id' | 'judge_email' | 'judge_name' | 'created_at'>) => {
-    const newId = `JDB-${Date.now()}`;
-    const newFeedback: JudgeFeedback = {
-      id: newId,
-      judge_email: user?.email || 'evaluator@system.domain',
-      judge_name: authName || 'Standard Evaluator',
-      created_at: new Date().toISOString().split('T')[0],
-      ...feedData
-    };
-
-    setJudgeFeedbacks(prev => [newFeedback, ...prev]);
-    supabaseService.upsertJudgeFeedback(newFeedback).catch(console.error);
+  // CAD ITERATIONS HUB PULLED-UP HANDLERS
+  const handleCreateIteration = (newIter: CadIteration) => {
+    setIterations([...iterations, newIter]);
+    supabaseService.upsertIteration(newIter).catch(console.error);
   };
 
-  const handleDeleteFeedback = (id: string) => {
-    setJudgeFeedbacks(prev => prev.filter(f => f.id !== id));
-    supabaseService.deleteJudgeFeedback(id).catch(console.error);
+  const handleEditIteration = (id: string, updatedIter: CadIteration) => {
+    setIterations(prev => prev.map(iter => iter.id === id ? updatedIter : iter));
+    supabaseService.upsertIteration(updatedIter).catch(console.error);
+  };
+
+  const handleDeleteIteration = (id: string) => {
+    setIterations(prev => prev.filter(iter => iter.id !== id));
+    supabaseService.deleteIteration(id).catch(console.error);
+  };
+
+  const handleUploadModel = async (id: string, file: File) => {
+    const url = await supabaseService.uploadModelFile(file);
+    const existing = iterations.find(iter => iter.id === id);
+    if (existing) {
+      const updatedIter = { ...existing, model_url: url, model_name: file.name };
+      supabaseService.upsertIteration(updatedIter).catch(console.error);
+    }
+    setIterations(prev => prev.map(iter => 
+      iter.id === id ? { ...iter, model_url: url, model_name: file.name } : iter
+    ));
   };
 
   // AUTHORIZED USERS ACCESS HANDLERS
@@ -866,7 +847,6 @@ Cardinal Overture F1 in Schools Team
             nodes={visibleNodes}
             expenditures={expenditures}
             simulatedDate={simulatedDate}
-            activeCadIteration={activeCadIteration}
             onRequestAccount={handleCreateAccountRequest}
           />
         ) : (
@@ -895,7 +875,13 @@ Cardinal Overture F1 in Schools Team
 
         {activeModule === 'Engineering & R&D' && (
           <div className="h-[calc(100vh-8rem)]">
-            <EngineeringHub iterations={iterations} setIterations={setIterations} />
+            <EngineeringHub 
+              iterations={iterations} 
+              onAddIteration={handleCreateIteration}
+              onEditIteration={handleEditIteration}
+              onDeleteIteration={handleDeleteIteration}
+              onUploadIterationModel={handleUploadModel}
+            />
           </div>
         )}
 
@@ -916,17 +902,22 @@ Cardinal Overture F1 in Schools Team
             onDeleteSponsorCommitment={handleDeleteSponsorCommitment}
             onAddNewsUpdate={handleAddNewsUpdate}
             onDeleteNewsUpdate={handleDeleteNewsUpdate}
+            onAddIteration={handleCreateIteration}
+            onEditIteration={handleEditIteration}
+            onDeleteIteration={handleDeleteIteration}
+            onUploadIterationModel={handleUploadModel}
           />
         )}
 
-        {(activeModule === 'Judge Portal' || activeModule === 'Evaluator Scores') && (
-          <JudgePortal 
+        {activeModule === 'To-Dos' && (
+          <TeamTodos 
             nodes={nodes}
-            iterations={iterations}
-            judgeFeedbacks={judgeFeedbacks}
-            onAddJudgeFeedback={handleAddJudgeFeedback}
-            onDeleteFeedback={handleDeleteFeedback}
-            newsUpdates={newsUpdates}
+            authorizedUsers={authorizedUsers}
+            currentRole={currentRole}
+            onAddTodo={handleCreateNode}
+            onUpdateStatus={handleUpdateStatus}
+            onDeleteTodo={handleDeleteNode}
+            onAssignTodo={handleAssignTodo}
           />
         )}
 

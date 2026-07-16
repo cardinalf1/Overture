@@ -1,18 +1,13 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { 
-  HeartHandshake, GanttChart as ChartIcon, FileText, Info, 
-  Mail, Send, CheckCircle, ShieldCheck, DollarSign
-} from 'lucide-react';
-import { Node, ExpenditureItem, CadIteration } from '../types';
+import { motion } from 'motion/react';
+import { HeartHandshake, Mail, Send, Calendar, DollarSign, Award, Target, HelpCircle } from 'lucide-react';
+import { Node, ExpenditureItem } from '../types';
 import { GanttChart } from './GanttChart';
-import { TopStats } from './TopStats';
 
 interface PublicWelcomeProps {
   nodes: Node[];
   expenditures: ExpenditureItem[];
   simulatedDate: string;
-  activeCadIteration: CadIteration | null;
   onRequestAccount: (email: string, notes: string) => Promise<void>;
 }
 
@@ -20,7 +15,6 @@ export function PublicWelcome({
   nodes,
   expenditures,
   simulatedDate,
-  activeCadIteration,
   onRequestAccount
 }: PublicWelcomeProps) {
   const [emailInput, setEmailInput] = useState('');
@@ -45,10 +39,10 @@ export function PublicWelcome({
 
     try {
       await onRequestAccount(emailInput.trim(), notesInput.trim());
-      setSuccessMsg('✔ Request logged! The Team Administrator will email your credentials.');
+      setSuccessMsg('✔ Registration request logged! The Team Administrator will provision your access profile.');
       setEmailInput('');
       setNotesInput('');
-      setTimeout(() => setSuccessMsg(''), 5000);
+      setTimeout(() => setSuccessMsg(''), 6000);
     } catch (err) {
       alert('Failed to submit request. Please try again.');
     } finally {
@@ -57,180 +51,112 @@ export function PublicWelcome({
   };
 
   return (
-    <div className="space-y-6 font-sans">
-      {/* Banner / Hero */}
-      <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-pulse" />
-            <span className="text-[9px] font-mono text-zinc-500 tracking-widest uppercase font-bold">PUBLIC GATEWAY</span>
+    <div className="max-w-4xl mx-auto space-y-8 py-8 font-sans px-4">
+      
+      {/* 1. Campaign Reallocation Progress (Financial Deck) */}
+      <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6 space-y-4 shadow-xl">
+        <div className="text-center">
+          <span className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase block font-bold">Campaign Reallocation Progress</span>
+          <h2 className="text-lg font-mono font-bold text-zinc-200 uppercase tracking-wider mt-1">Secured Sponsor Contributions & Funding Stats</h2>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-black/40 border border-zinc-900 p-4 rounded text-center">
+            <span className="text-[9px] font-mono text-zinc-500 block uppercase tracking-wider">Target Campaign Budget</span>
+            <span className="text-xl font-mono text-zinc-350 font-bold block mt-1">₹{totalBudgetNeeded.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
           </div>
-          <h1 className="text-lg font-mono font-bold text-zinc-100 uppercase tracking-wider mt-0.5">Cardinal Overture F1 Campaign</h1>
-          <p className="text-[10px] text-zinc-500 mt-1 font-mono uppercase">Browse our development timeline and procurement goals. Request sponsor credentials to back open resources.</p>
+          <div className="bg-black/40 border border-emerald-950/40 p-4 rounded text-center">
+            <span className="text-[9px] font-mono text-emerald-500 block uppercase tracking-wider font-bold">Amount Secured (Pledged)</span>
+            <span className="text-xl font-mono text-emerald-400 font-bold block mt-1">₹{totalBudgetPledged.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+          <div className="bg-zinc-900/10 border border-dashed border-zinc-800 p-4 rounded text-center">
+            <span className="text-[9px] font-mono text-zinc-400 block uppercase tracking-wider">Remaining Funding Gap</span>
+            <span className="text-xl font-mono text-zinc-400 font-bold block mt-1">₹{totalBudgetRemaining.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="space-y-2 pt-2">
+          <div className="flex justify-between text-[10px] font-mono text-zinc-500">
+            <span>CAMPAIGN FUNDING PROGRESS</span>
+            <span>{progressPercent}% SECURED</span>
+          </div>
+          <div className="w-full bg-zinc-900 rounded-full h-2.5 overflow-hidden">
+            <div 
+              className="bg-emerald-500 h-full transition-all duration-700" 
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Stats Deck */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left/Middle: Gantt Timeline */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Gantt */}
-          <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <ChartIcon className="w-4 h-4 text-zinc-400" />
-              <span className="text-[10px] font-mono text-zinc-400 tracking-widest uppercase font-bold">Project Execution Gantt</span>
-            </div>
-            <div className="h-96">
-              <GanttChart nodes={nodes} simulatedDate={simulatedDate} />
-            </div>
+      {/* 2. Centered Registration Form ("Register Now") */}
+      <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-8 space-y-6 shadow-xl max-w-2xl mx-auto">
+        <div className="text-center space-y-1">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-950/30 border border-emerald-900/30 mb-2">
+            <HeartHandshake className="w-6 h-6 text-emerald-400" />
           </div>
-
-          {/* Ledger Table */}
-          <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6 space-y-4">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-zinc-400" />
-              <span className="text-[10px] font-mono text-zinc-400 tracking-widest uppercase font-bold">Campaign Procurement Ledger</span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono border-collapse">
-                <thead>
-                  <tr className="border-b border-zinc-900 text-[10px] text-zinc-650 uppercase tracking-widest">
-                    <th className="pb-3 font-normal">ITEM & REQUISITION</th>
-                    <th className="pb-3 font-normal">CATEGORY</th>
-                    <th className="pb-3 font-normal">COST</th>
-                    <th className="pb-3 font-normal">NEEDED DATE</th>
-                    <th className="pb-3 font-normal text-right">STATUS</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-900">
-                  {expenditures.map(item => (
-                    <tr key={item.id} className="hover:bg-zinc-900/10 transition-colors">
-                      <td className="py-3.5 pr-4">
-                        <span className="text-zinc-200 font-bold block">{item.item_name}</span>
-                        <span className="text-[9px] text-zinc-600 uppercase">ID: {item.id}</span>
-                      </td>
-                      <td className="py-3.5 pr-4">
-                        <span className="bg-zinc-900/50 border border-zinc-900 text-zinc-450 px-2 py-0.5 rounded text-[9px]">
-                          {item.category}
-                        </span>
-                      </td>
-                      <td className="py-3.5 pr-4 text-zinc-300 font-bold">
-                        ₹{item.cost.toFixed(2)}
-                      </td>
-                      <td className="py-3.5 pr-4 text-zinc-500">
-                        {item.needed_by}
-                      </td>
-                      <td className="py-3.5 text-right">
-                        {item.status === 'Pledged' ? (
-                          <span className="text-emerald-400 font-bold uppercase text-[9px] flex items-center justify-end gap-1">
-                            <CheckCircle className="w-3.5 h-3.5" /> Pledged
-                          </span>
-                        ) : (
-                          <span className="text-zinc-600 uppercase text-[9px] font-bold">
-                            ○ Open Resource
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <h2 className="text-md font-mono font-bold text-zinc-100 uppercase tracking-wider">Become a Strategic Partner / Register Now</h2>
+          <p className="text-[10px] font-mono text-zinc-500 uppercase max-w-md mx-auto leading-relaxed">
+            Pledge resources or back physical deliverables on our active roadmap. Request strategic credentials to access the secure partner cockpit.
+          </p>
         </div>
 
-        {/* Right: Budget Statistics & Request Account */}
-        <div className="space-y-6">
-          {/* Budget stats */}
-          <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6 space-y-4">
-            <span className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase block font-bold">Campaign Reallocation Progress</span>
-            
-            <div className="grid grid-cols-3 gap-2">
-              <div className="bg-black/55 border border-zinc-900 p-3 rounded text-center">
-                <span className="text-[8px] font-mono text-zinc-500 block uppercase">GOAL</span>
-                <span className="text-xs font-mono text-zinc-200 font-bold">₹{totalBudgetNeeded.toFixed(0)}</span>
-              </div>
-              <div className="bg-black/55 border border-emerald-950/40 p-3 rounded text-center">
-                <span className="text-[8px] font-mono text-emerald-500 block uppercase">PLEDGED</span>
-                <span className="text-xs font-mono text-emerald-400 font-bold">₹{totalBudgetPledged.toFixed(0)}</span>
-              </div>
-              <div className="bg-zinc-900/10 border border-dashed border-zinc-800 p-3 rounded text-center">
-                <span className="text-[8px] font-mono text-zinc-400 block uppercase">GAP</span>
-                <span className="text-xs font-mono text-zinc-400 font-bold">₹{totalBudgetRemaining.toFixed(0)}</span>
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-[10px] font-mono text-zinc-500">
-                <span>TOTAL SECURED</span>
-                <span>{progressPercent}%</span>
-              </div>
-              <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
-                <div 
-                  className="bg-emerald-500 h-full transition-all duration-500" 
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
+        <form onSubmit={handleSubmit} className="space-y-4 font-mono text-xs max-w-lg mx-auto">
+          <div className="space-y-1.5">
+            <label className="text-[9px] text-zinc-450 uppercase block font-bold">Email Address</label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-3 w-4 h-4 text-zinc-650" />
+              <input
+                type="email"
+                required
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                placeholder="representative@yourorganization.com"
+                className="w-full bg-black border border-zinc-900 rounded pl-10 pr-3 py-2.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-800 transition-colors"
+              />
             </div>
           </div>
 
-          {/* Account Request form */}
-          <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6 space-y-4">
-            <div className="flex items-center gap-2 text-zinc-200">
-              <HeartHandshake className="w-4 h-4 text-emerald-500" />
-              <span className="text-xs font-mono font-bold uppercase tracking-wider">Become a strategic partner</span>
-            </div>
-
-            <p className="text-[10px] font-mono text-zinc-500 uppercase leading-relaxed">
-              If your brand or organization wishes to pledge support for any open resources, please request secure credentials below. Our Lead Administrator will provision your access profile.
-            </p>
-
-            <form onSubmit={handleSubmit} className="space-y-3 font-mono text-xs">
-              <div className="space-y-1">
-                <label className="text-[9px] text-zinc-500 uppercase block font-bold">Email Identifier</label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-2.5 w-4 h-4 text-zinc-600" />
-                  <input
-                    type="email"
-                    required
-                    value={emailInput}
-                    onChange={(e) => setEmailInput(e.target.value)}
-                    placeholder="partner@yourbrand.com"
-                    className="w-full bg-black border border-zinc-900 rounded pl-9 pr-3 py-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-800"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[9px] text-zinc-500 uppercase block font-bold">Note / Organization</label>
-                <textarea
-                  value={notesInput}
-                  onChange={(e) => setNotesInput(e.target.value)}
-                  placeholder="e.g. Sponsor inquiry from Acme Corp, looking to back Materials"
-                  rows={2}
-                  className="w-full bg-black border border-zinc-900 rounded p-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-800 resize-none placeholder-zinc-800"
-                />
-              </div>
-
-              {successMsg && (
-                <div className="bg-emerald-950/20 text-emerald-400 border border-emerald-900/40 p-2 rounded text-[9px] text-center leading-relaxed">
-                  {successMsg}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={submitting || !emailInput.trim()}
-                className="w-full text-center bg-zinc-100 hover:bg-white text-black font-bold p-2.5 rounded transition-all uppercase tracking-widest text-[10px] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Send className="w-3.5 h-3.5" />
-                {submitting ? 'LOGGING REQUEST...' : 'REQUEST PARTNER ACCESS'}
-              </button>
-            </form>
+          <div className="space-y-1.5">
+            <label className="text-[9px] text-zinc-450 uppercase block font-bold">Organization Note / Message</label>
+            <textarea
+              value={notesInput}
+              onChange={(e) => setNotesInput(e.target.value)}
+              placeholder="e.g. Acme Corp seeking sponsor credentials to back software licences and physical blocks."
+              rows={3}
+              className="w-full bg-black border border-zinc-900 rounded p-3 text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-800 resize-none placeholder-zinc-800 transition-colors"
+            />
           </div>
+
+          {successMsg && (
+            <div className="bg-emerald-950/20 text-emerald-450 border border-emerald-900/40 p-3 rounded text-[10px] text-center leading-relaxed font-bold uppercase">
+              {successMsg}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={submitting || !emailInput.trim()}
+            className="w-full text-center bg-zinc-100 hover:bg-white text-black font-bold p-3 rounded transition-all uppercase tracking-widest text-[10px] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shadow-lg"
+          >
+            <Send className="w-3.5 h-3.5" />
+            {submitting ? 'LOGGING REQUEST...' : 'REGISTER / SUBMIT ACCESS REQUEST'}
+          </button>
+        </form>
+      </div>
+
+      {/* 3. Gantt Chart (Under the registration form, huge!) */}
+      <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6 space-y-4 shadow-xl">
+        <div className="flex items-center gap-2 border-b border-zinc-900 pb-3">
+          <Target className="w-4 h-4 text-zinc-400" />
+          <span className="text-[10px] font-mono text-zinc-400 tracking-widest uppercase font-bold">Project Execution Milestones & Active Gantt Chart</span>
+        </div>
+        <div className="h-[650px] overflow-hidden">
+          <GanttChart nodes={nodes} simulatedDate={simulatedDate} />
         </div>
       </div>
+      
     </div>
   );
 }

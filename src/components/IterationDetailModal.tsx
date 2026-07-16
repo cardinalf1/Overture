@@ -98,7 +98,14 @@ export function IterationDetailModal({ iteration, onClose, onUploadModel, onEdit
           </div>
           
           {/* Right: Details */}
-          <div className="w-80 p-6 bg-black flex flex-col gap-6">
+          <div className="w-80 p-6 bg-black flex flex-col gap-6 overflow-y-auto">
+            <div>
+              <h3 className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest mb-2">Part Name / Type</h3>
+              <div className="text-sm font-mono text-zinc-200 font-bold uppercase">
+                {iteration.part_name || 'Car'}
+              </div>
+            </div>
+
             <div>
               <h3 className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest mb-2">Iteration Status</h3>
               <div className="inline-block px-2 py-1 bg-zinc-900 border border-zinc-800 rounded text-xs font-mono text-zinc-300 uppercase tracking-widest">
@@ -126,9 +133,9 @@ export function IterationDetailModal({ iteration, onClose, onUploadModel, onEdit
             </div>
 
             <div>
-              <h3 className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest mb-2">Drag Coefficient (Cd)</h3>
-              <div className="text-2xl font-mono text-zinc-100">
-                {iteration.drag_coefficient_cd.toFixed(3)}
+              <h3 className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest mb-2">Description</h3>
+              <div className="text-xs font-mono text-zinc-400 leading-relaxed uppercase whitespace-pre-wrap">
+                {iteration.description || 'No description provided.'}
               </div>
             </div>
           </div>

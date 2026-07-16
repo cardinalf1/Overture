@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   DollarSign, CheckCircle, Calendar, Box, Sparkles, HeartHandshake, 
-  TrendingUp, Plus, Trash2, Eye, ShieldCheck, Info, FileText, Check, Copy 
+  TrendingUp, Plus, Trash2, Eye, ShieldCheck, Info, FileText, Check, Copy, Upload, Edit2
 } from 'lucide-react';
 import { ExpenditureItem, ExpenditureCategory, CadIteration, Node, AuthorizedUser, SponsorCommitment, NewsUpdate } from '../types';
 import { GanttChart } from './GanttChart';
 import { ModelViewer } from './ModelViewer';
 import { useAuth } from './AuthGate';
 import { sendEmail } from '../lib/emailService';
+import { NewIterationModal } from './NewIterationModal';
+import { IterationDetailModal } from './IterationDetailModal';
 
 interface PartnerPortalProps {
   expenditures: ExpenditureItem[];
@@ -26,6 +28,10 @@ interface PartnerPortalProps {
   onDeleteSponsorCommitment: (id: string) => void;
   onAddNewsUpdate: (news: Omit<NewsUpdate, 'id' | 'created_at'>) => void;
   onDeleteNewsUpdate: (id: string) => void;
+  onAddIteration: (iter: Omit<CadIteration, 'id'>) => void;
+  onEditIteration: (id: string, iter: Omit<CadIteration, 'id'>) => void;
+  onDeleteIteration: (id: string) => void;
+  onUploadIterationModel: (id: string, file: File) => void;
 }
 
 export function PartnerPortal({
@@ -43,9 +49,19 @@ export function PartnerPortal({
   onUpdateSponsorCommitmentStatus,
   onDeleteSponsorCommitment,
   onAddNewsUpdate,
-  onDeleteNewsUpdate
+  onDeleteNewsUpdate,
+  onAddIteration,
+  onEditIteration,
+  onDeleteIteration,
+  onUploadIterationModel
 }: PartnerPortalProps) {
   const { user, role, name: currentSponsorName } = useAuth();
+
+  // Local state for CAD Iterations editing/uploading in Sponsor Portal
+  const [selectedIteration, setSelectedIteration] = useState<CadIteration | null>(null);
+  const [editingIteration, setEditingIteration] = useState<CadIteration | null>(null);
+  const [isNewIterationModalOpen, setIsNewIterationModalOpen] = useState(false);
+  const [activeIterationId, setActiveIterationId] = useState<string | null>(null);
   
   // Gmail notification status tracking
   const [emailSending, setEmailSending] = useState(false);
@@ -233,8 +249,7 @@ Cardinal Overture F1 in Schools Team`;
     setNewItemCost('');
     setIsAdding(false);
   };
-
-  const latestCar = iterations.find(i => i.status === 'Simulated' || i.status === 'Milled') || iterations[iterations.length - 1];
+  const activeCar = iterations.find(i => i.id === activeIterationId) || iterations.find(i => i.status === 'Simulated' || i.status === 'Milled') || iterations[iterations.length - 1];
 
   return (
     <div className="space-y-6 font-sans">
@@ -268,39 +283,39 @@ Cardinal Overture F1 in Schools Team`;
         </div>
       )}
 
-      {/* Sub-navigation */}
-      <div className="flex border-b border-zinc-900 gap-6 overflow-x-auto whitespace-nowrap">
+      {/* Tabs Row */}
+      <div className="flex border-b border-zinc-900 shrink-0">
         <button
           onClick={() => setActiveTab('overview')}
-          className={`pb-3 text-xs font-mono uppercase tracking-widest border-b-2 transition-all ${
+          className={`px-4 py-2 border-b-2 text-xs font-mono transition-all ${
             activeTab === 'overview' ? 'border-zinc-100 text-zinc-100 font-bold' : 'border-transparent text-zinc-500 hover:text-zinc-300'
           }`}
         >
-          01 // OVERVIEW & DESIGN
+          Overview
         </button>
         <button
           onClick={() => setActiveTab('pledge')}
-          className={`pb-3 text-xs font-mono uppercase tracking-widest border-b-2 transition-all ${
+          className={`px-4 py-2 border-b-2 text-xs font-mono transition-all ${
             activeTab === 'pledge' ? 'border-zinc-100 text-zinc-100 font-bold' : 'border-transparent text-zinc-500 hover:text-zinc-300'
           }`}
         >
-          02 // SPONSOR PLEDGES ({expenditures.filter(e => e.status === 'Pending').length} OPEN)
+          Procurement Ledger
         </button>
         <button
           onClick={() => setActiveTab('updates')}
-          className={`pb-3 text-xs font-mono uppercase tracking-widest border-b-2 transition-all ${
+          className={`px-4 py-2 border-b-2 text-xs font-mono transition-all ${
             activeTab === 'updates' ? 'border-zinc-100 text-zinc-100 font-bold' : 'border-transparent text-zinc-500 hover:text-zinc-300'
           }`}
         >
-          03 // PROJECT NEWS & REPORTS
+          Strategic Updates
         </button>
         <button
           onClick={() => setActiveTab('commitments')}
-          className={`pb-3 text-xs font-mono uppercase tracking-widest border-b-2 transition-all ${
+          className={`px-4 py-2 border-b-2 text-xs font-mono transition-all ${
             activeTab === 'commitments' ? 'border-zinc-100 text-zinc-100 font-bold' : 'border-transparent text-zinc-500 hover:text-zinc-300'
           }`}
         >
-          04 // DELIVERABLES & COMMITMENTS
+          Committed Deliverables
         </button>
       </div>
 
@@ -311,20 +326,16 @@ Cardinal Overture F1 in Schools Team`;
             <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <span className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase block">CURRENT AERODYNAMIC DESIGN</span>
+                  <span className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase block">CURRENT PART/CAR 3D PREVIEW</span>
                   <h3 className="text-sm font-mono font-bold text-zinc-100 tracking-wider uppercase">
-                    {latestCar ? `${latestCar.id} // ${latestCar.cad_file_ref}` : 'CARDINAL CAR PROTOTYPE'}
+                    {activeCar ? `${activeCar.id} // ${activeCar.part_name || 'Car'} // ${activeCar.cad_file_ref}` : 'CARDINAL ASSEMBLY PREVIEW'}
                   </h3>
                 </div>
-                {latestCar && (
+                {activeCar && (
                   <div className="flex gap-4">
                     <div className="bg-black border border-zinc-900 px-3 py-1 rounded">
-                      <span className="text-[9px] font-mono text-zinc-500 uppercase block">DRAG COEFFICIENT</span>
-                      <span className="text-xs font-mono text-zinc-200 font-bold">Cd {latestCar.drag_coefficient_cd.toFixed(4)}</span>
-                    </div>
-                    <div className="bg-black border border-zinc-900 px-3 py-1 rounded">
-                      <span className="text-[9px] font-mono text-zinc-500 uppercase block">MASS SPEC</span>
-                      <span className="text-xs font-mono text-zinc-200 font-bold">{latestCar.weight_grams} g</span>
+                      <span className="text-[9px] font-mono text-zinc-500 uppercase block">PART WEIGHT</span>
+                      <span className="text-xs font-mono text-zinc-200 font-bold">{activeCar.weight_grams} g</span>
                     </div>
                   </div>
                 )}
@@ -332,8 +343,8 @@ Cardinal Overture F1 in Schools Team`;
 
               {/* 3D Model or CSS CAD Placeholder */}
               <div className="h-80 relative rounded border border-zinc-900 overflow-hidden bg-black flex items-center justify-center">
-                {latestCar?.model_url ? (
-                  <ModelViewer url={latestCar.model_url} />
+                {activeCar?.model_url ? (
+                  <ModelViewer url={activeCar.model_url} />
                 ) : (
                   <div className="relative w-full h-full flex flex-col items-center justify-center p-6 bg-[linear-gradient(to_right,#111_1px,transparent_1px),linear-gradient(to_bottom,#111_1px,transparent_1px)] bg-[size:1.5rem_1.5rem] opacity-90 text-center">
                     {/* Retro wireframe look car */}
@@ -346,6 +357,99 @@ Cardinal Overture F1 in Schools Team`;
                     <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest mt-1">Virtual Wind Tunnel Aero Simulation Ready</span>
                   </div>
                 )}
+              </div>
+            </div>
+
+            {/* CAD Iterations & Parts section inside Sponsor Portal */}
+            <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6 space-y-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <span className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase block">CAD ITERATIONS & PARTS</span>
+                  <h3 className="text-sm font-mono font-bold text-zinc-100 tracking-wider uppercase">Upload, Edit & View F1 Components</h3>
+                </div>
+                <button
+                  onClick={() => { setEditingIteration(null); setIsNewIterationModalOpen(true); }}
+                  className="flex items-center gap-1.5 text-[10px] font-mono bg-zinc-100 hover:bg-white text-black font-bold px-3 py-1.5 rounded transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  ADD COMPONENT
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {iterations.map((iter) => {
+                  const isActive = activeCar?.id === iter.id;
+                  return (
+                    <div
+                      key={iter.id}
+                      onClick={() => setActiveIterationId(iter.id)}
+                      className={`p-4 rounded-lg border transition-all cursor-pointer flex flex-col gap-3 relative group overflow-hidden ${
+                        isActive ? 'bg-zinc-900/40 border-zinc-500' : 'bg-black border-zinc-900 hover:border-zinc-800'
+                      }`}
+                    >
+                      {/* Action buttons on hover */}
+                      <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditingIteration(iter); setIsNewIterationModalOpen(true); }}
+                          className="p-1 bg-zinc-900 text-zinc-400 hover:text-white rounded border border-zinc-800"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onDeleteIteration(iter.id); }}
+                          className="p-1 bg-zinc-900 text-zinc-400 hover:text-rose-400 rounded border border-zinc-800"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="text-xs font-mono font-bold text-zinc-200">{iter.part_name || 'Generic Part'}</h4>
+                          <span className="text-[9px] font-mono text-zinc-500">{iter.id} // {iter.date}</span>
+                        </div>
+                        <span className="px-1.5 py-0.5 bg-zinc-900 border border-zinc-800 rounded text-[8px] font-mono text-zinc-400 uppercase">
+                          {iter.status}
+                        </span>
+                      </div>
+
+                      <div className="text-[10px] text-zinc-400 font-mono leading-relaxed line-clamp-2">
+                        {iter.description || 'No description provided.'}
+                      </div>
+
+                      <div className="flex justify-between items-center text-[10px] font-mono pt-2 border-t border-zinc-900/60 mt-auto">
+                        <span className="text-zinc-500">Weight: <strong className="text-zinc-300 font-normal">{iter.weight_grams}g</strong></span>
+                        
+                        {/* File Upload / Status Indicator */}
+                        {iter.model_url ? (
+                          <span className="text-[8px] font-bold tracking-wider border border-emerald-900/40 bg-emerald-950/20 text-emerald-400 px-1.5 py-0.5 rounded uppercase">3D ACTIVE</span>
+                        ) : (
+                          <label className="text-[9px] font-bold text-zinc-500 hover:text-zinc-300 uppercase cursor-pointer flex items-center gap-1 border border-dashed border-zinc-800 hover:border-zinc-700 px-2 py-0.5 rounded transition-all">
+                            <Upload className="w-2.5 h-2.5" />
+                            PUT STL
+                            <input
+                              type="file"
+                              accept=".stl"
+                              className="hidden"
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  if (file.name.toLowerCase().endsWith('.stl')) {
+                                    onUploadIterationModel(iter.id, file);
+                                  } else {
+                                    alert('Please upload an .stl file.');
+                                  }
+                                }
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -1232,6 +1336,23 @@ Cardinal Overture F1 in Schools Team`;
           </div>
         </div>
       )}
+
+      {/* CAD Modals inside Sponsor Portal */}
+      <NewIterationModal 
+        isOpen={isNewIterationModalOpen} 
+        onClose={() => { setIsNewIterationModalOpen(false); setEditingIteration(null); }} 
+        onCreate={onAddIteration} 
+        initialData={editingIteration}
+        onEdit={onEditIteration}
+      />
+
+      <IterationDetailModal
+        iteration={selectedIteration}
+        onClose={() => setSelectedIteration(null)}
+        onUploadModel={onUploadIterationModel}
+        onEdit={(iter) => { setEditingIteration(iter); setIsNewIterationModalOpen(true); }}
+        onDelete={onDeleteIteration}
+      />
     </div>
   );
 }

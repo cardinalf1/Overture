@@ -13,6 +13,7 @@ export interface Node {
   actual_start: string | null;
   actual_end: string | null;
   dependency?: string; // ID of the node it depends on
+  assigned_to?: string | null;
 }
 
 export type IterationStatus = 'Draft' | 'Simulated' | 'Milled' | 'Rejected';
@@ -22,10 +23,12 @@ export interface CadIteration {
   date: string;
   cad_file_ref: string;
   weight_grams: number;
-  drag_coefficient_cd: number;
+  drag_coefficient_cd?: number;
   status: IterationStatus;
   model_url?: string;
   model_name?: string;
+  description?: string;
+  part_name?: string;
 }
 
 export type ExpenditureCategory = 'Manufacturing' | 'Materials' | 'Software' | 'Travel' | 'Marketing' | 'Entry Fees';
@@ -50,16 +53,6 @@ export interface NewsUpdate {
   author: string;
 }
 
-export interface JudgeFeedback {
-  id: string;
-  judge_email: string;
-  judge_name: string;
-  category: string; // 'Engineering Design' | 'Project Management' | 'Sponsor & Portfolio' | 'Overall'
-  score: number; // 1 to 10
-  comments: string;
-  created_at: string;
-}
-
 export interface AuthorizedUser {
   id: string;
   email: string;
@@ -80,3 +73,4 @@ export interface SponsorCommitment {
   status: 'In Queue' | 'In Progress' | 'Fulfilled';
   assigned_by: string;
 }
+

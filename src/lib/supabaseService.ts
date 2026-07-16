@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { Node, CadIteration, ExpenditureItem, NewsUpdate, JudgeFeedback, AuthorizedUser, SponsorCommitment } from '../types';
+import { Node, CadIteration, ExpenditureItem, NewsUpdate, AuthorizedUser, SponsorCommitment } from '../types';
 
 export const supabaseService = {
   // --- Nodes (Tasks) ---
@@ -42,7 +42,8 @@ export const supabaseService = {
           planned_end: node.planned_end,
           actual_start: node.actual_start,
           actual_end: node.actual_end,
-          dependency: node.dependency || null
+          dependency: node.dependency || null,
+          assigned_to: node.assigned_to || null
         });
 
       if (error) throw error;
@@ -100,10 +101,12 @@ export const supabaseService = {
           date: iteration.date,
           cad_file_ref: iteration.cad_file_ref,
           weight_grams: iteration.weight_grams,
-          drag_coefficient_cd: iteration.drag_coefficient_cd,
+          drag_coefficient_cd: iteration.drag_coefficient_cd ?? 0.0,
           status: iteration.status,
           model_url: iteration.model_url || null,
-          model_name: iteration.model_name || null
+          model_name: iteration.model_name || null,
+          description: iteration.description || null,
+          part_name: iteration.part_name || null
         });
 
       if (error) throw error;
@@ -234,62 +237,6 @@ export const supabaseService = {
       if (error) throw error;
     } catch (e) {
       console.error('Error deleting news update:', e);
-    }
-  },
-
-  // --- Judge Feedback & Grading ---
-  async getJudgeFeedback(): Promise<JudgeFeedback[]> {
-    if (!isSupabaseConfigured || !supabase) return [];
-    try {
-      const { data, error } = await supabase
-        .from('judge_feedback')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
-          console.warn('Table "judge_feedback" does not exist yet.');
-          return [];
-        }
-        throw error;
-      }
-      return (data || []) as JudgeFeedback[];
-    } catch (e) {
-      console.error('Error fetching judge feedback:', e);
-      return [];
-    }
-  },
-
-  async upsertJudgeFeedback(feedback: JudgeFeedback): Promise<void> {
-    if (!isSupabaseConfigured || !supabase) return;
-    try {
-      const { error } = await supabase
-        .from('judge_feedback')
-        .upsert({
-          id: feedback.id,
-          judge_email: feedback.judge_email,
-          judge_name: feedback.judge_name,
-          category: feedback.category,
-          score: feedback.score,
-          comments: feedback.comments,
-          created_at: feedback.created_at
-        });
-      if (error) throw error;
-    } catch (e) {
-      console.error('Error upserting judge feedback:', e);
-    }
-  },
-
-  async deleteJudgeFeedback(id: string): Promise<void> {
-    if (!isSupabaseConfigured || !supabase) return;
-    try {
-      const { error } = await supabase
-        .from('judge_feedback')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
-    } catch (e) {
-      console.error('Error deleting judge feedback:', e);
     }
   },
 

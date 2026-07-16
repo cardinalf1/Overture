@@ -1,4 +1,4 @@
-import { LayoutDashboard, Cpu, Settings, LogOut, Sparkles, HeartHandshake, Award, ShieldCheck, Lock } from 'lucide-react';
+import { LayoutDashboard, Cpu, Settings, LogOut, Sparkles, HeartHandshake, ListTodo, ShieldCheck, Lock } from 'lucide-react';
 import { Role } from '../types';
 import { useAuth } from './AuthGate';
 
@@ -20,21 +20,17 @@ export function Header({ currentRole, onRoleChange, activeModule, onModuleChange
   if (authRole === 'Team') {
     navItems.push(
       { name: 'Command Center', icon: LayoutDashboard },
+      { name: 'To-Dos', icon: ListTodo },
       { name: 'Engineering & R&D', icon: Cpu },
       { name: 'Sponsor Portal', icon: HeartHandshake },
-      { name: 'Evaluator Scores', icon: Award },
       { name: 'Access Control', icon: ShieldCheck }
     );
   } else if (authRole === 'Sponsor') {
     navItems.push(
       { name: 'Sponsor Portal', icon: HeartHandshake }
     );
-  } else if (authRole === 'Judge') {
-    navItems.push(
-      { name: 'Judge Portal', icon: Award }
-    );
   } else {
-    // Guest role
+    // Guest role (removing Judge navigation completely!)
     navItems.push(
       { name: 'Progress & Timeline', icon: LayoutDashboard }
     );
