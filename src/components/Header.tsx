@@ -17,14 +17,16 @@ export function Header({ currentRole, onRoleChange, activeModule, onModuleChange
 
   // Determine dynamic navigation based on Auth Role
   const navItems = [];
-  if (authRole === 'Team') {
+  if (authRole === 'Team' || authRole === 'Admin') {
     navItems.push(
       { name: 'Command Center', icon: LayoutDashboard },
       { name: 'To-Dos', icon: ListTodo },
       { name: 'Engineering & R&D', icon: Cpu },
-      { name: 'Sponsor Portal', icon: HeartHandshake },
-      { name: 'Access Control', icon: ShieldCheck }
+      { name: 'Sponsor Portal', icon: HeartHandshake }
     );
+    if (authRole === 'Admin') {
+      navItems.push({ name: 'Access Control', icon: ShieldCheck });
+    }
   } else if (authRole === 'Sponsor') {
     navItems.push(
       { name: 'Sponsor Portal', icon: HeartHandshake }
