@@ -150,18 +150,14 @@ export function AuthGate({ children }: AuthGateProps) {
           let mockName = emailLower.split('@')[0];
           let mockDept: 'Design' | 'Engineering' | 'PM' = 'Design';
           
-          if (emailLower === 'contact@cardinalsystems.org' || emailLower === 'raghav@cardinalsystems.org') {
+          if (emailLower === 'contact@cardinalsystems.org' || emailLower === 'raghav@cardinalsystems.org' || emailLower === 'neel@cardinalsystems.org') {
             mockRole = 'Admin';
             mockDept = 'PM';
-            mockName = emailLower === 'raghav@cardinalsystems.org' ? 'Raghav' : 'Contact Admin';
+            mockName = emailLower === 'raghav@cardinalsystems.org' ? 'Raghav' : (emailLower === 'neel@cardinalsystems.org' ? 'Neel' : 'Contact Admin');
           } else if (emailLower === 'manthan@cardinalsystems.org') {
             mockRole = 'Team';
             mockDept = 'Design';
             mockName = 'Manthan';
-          } else if (emailLower === 'neel@cardinalsystems.org') {
-            mockRole = 'Team';
-            mockDept = 'Engineering';
-            mockName = 'Neel';
           } else if (emailLower === 'rudra@cardinalsystems.org') {
             mockRole = 'Team';
             mockDept = 'Design';
