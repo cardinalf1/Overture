@@ -11,6 +11,7 @@ interface EngineeringHubProps {
   onEditIteration: (id: string, updatedIter: CadIteration) => void;
   onDeleteIteration: (id: string) => void;
   onUploadIterationModel: (id: string, file: File) => void;
+  isAdmin?: boolean;
 }
 
 export function EngineeringHub({
@@ -19,6 +20,7 @@ export function EngineeringHub({
   onEditIteration,
   onDeleteIteration,
   onUploadIterationModel,
+  isAdmin = false,
 }: EngineeringHubProps) {
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [selectedIteration, setSelectedIteration] = useState<CadIteration | null>(null);
@@ -101,22 +103,24 @@ export function EngineeringHub({
                 className="bg-zinc-950 border border-zinc-900 rounded-lg p-5 flex flex-col gap-4 hover:border-zinc-700 transition-colors relative group overflow-hidden"
               >
                 {/* Hover Action Buttons */}
-                <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); openEditModal(iter); }}
-                    className="p-1.5 bg-zinc-900/90 backdrop-blur text-zinc-400 hover:text-white rounded border border-zinc-700 transition-colors cursor-pointer"
-                    title="Edit Iteration"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onDeleteIteration(iter.id); }}
-                    className="p-1.5 bg-zinc-900/90 backdrop-blur text-zinc-400 hover:text-rose-455 rounded border border-zinc-700 transition-colors cursor-pointer"
-                    title="Delete Iteration"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                {isAdmin && (
+                  <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openEditModal(iter); }}
+                      className="p-1.5 bg-zinc-900/90 backdrop-blur text-zinc-400 hover:text-white rounded border border-zinc-700 transition-colors cursor-pointer"
+                      title="Edit Iteration"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDeleteIteration(iter.id); }}
+                      className="p-1.5 bg-zinc-900/90 backdrop-blur text-zinc-400 hover:text-rose-455 rounded border border-zinc-700 transition-colors cursor-pointer"
+                      title="Delete Iteration"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
 
                 {/* Header */}
                 <div className="flex justify-between items-start">
@@ -125,26 +129,31 @@ export function EngineeringHub({
                     <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest block">{iter.id} // {iter.date}</span>
                   </div>
                   <div onClick={(e) => e.stopPropagation()} className="relative z-10">
-                    <select
-                      value={iter.status}
-                      onChange={(e) => handleQuickStatusMove(iter, e.target.value as IterationStatus)}
-                      className="bg-zinc-950 border border-zinc-900 text-zinc-300 text-[10px] font-mono px-2 py-0.5 rounded outline-none cursor-pointer focus:border-zinc-500"
-                    >
-                      <option value="Draft">Draft</option>
-                      <option value="Simulated">Simulated</option>
-                      <option value="Milled">Milled</option>
-                      <option value="Rejected">Rejected</option>
-                    </select>
+                    {isAdmin ? (
+                      <select
+                        value={iter.status}
+                        onChange={(e) => handleQuickStatusMove(iter, e.target.value as IterationStatus)}
+                        className="bg-zinc-950 border border-zinc-900 text-zinc-300 text-[10px] font-mono px-2 py-0.5 rounded outline-none cursor-pointer focus:border-zinc-500"
+                      >
+                        <option value="Draft">Draft</option>
+                        <option value="Simulated">Simulated</option>
+                        <option value="Milled">Milled</option>
+                        <option value="Rejected">Rejected</option>
+                      </select>
+                    ) : (
+                      <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded border border-zinc-900 bg-zinc-950 text-zinc-500">
+                        {iter.status}
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                {/* 3D Model Rendering or Upload */}
                 <div className="h-44 relative rounded border border-zinc-900 overflow-hidden bg-black flex items-center justify-center">
                   {iter.model_url ? (
                     <div className="w-full h-full" onClick={() => setSelectedIteration(iter)}>
                       <ModelViewer url={iter.model_url} />
                     </div>
-                  ) : (
+                  ) : isAdmin ? (
                     <label className="w-full h-full flex flex-col items-center justify-center text-center p-4 cursor-pointer hover:bg-zinc-900/40 transition-colors">
                       <Upload className="w-8 h-8 text-zinc-650 mb-2" />
                       <span className="text-[10px] font-mono text-zinc-400">PUT STL FILE</span>
@@ -165,6 +174,11 @@ export function EngineeringHub({
                         }}
                       />
                     </label>
+                  ) : (
+                    <div className="flex flex-col items-center text-center p-4">
+                      <Box className="w-8 h-8 text-zinc-800 mb-2" />
+                      <span className="text-[10px] font-mono text-zinc-600">NO STL MODEL ATTACHED</span>
+                    </div>
                   )}
                 </div>
 
@@ -197,15 +211,17 @@ export function EngineeringHub({
           })}
 
           {/* New Iteration Node */}
-          <button 
-            onClick={() => { setEditingIteration(null); setIsNewModalOpen(true); }} 
-            className="border border-dashed border-zinc-800 rounded-lg flex flex-col items-center justify-center p-6 hover:bg-zinc-900/30 hover:border-zinc-700 transition-colors h-full min-h-[280px] group"
-          >
-            <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center mb-4 group-hover:bg-zinc-800 transition-colors">
-              <Plus className="w-6 h-6 text-zinc-500 group-hover:text-zinc-200" />
-            </div>
-            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest group-hover:text-zinc-300">Initialize Component Iteration</span>
-          </button>
+          {isAdmin && (
+            <button 
+              onClick={() => { setEditingIteration(null); setIsNewModalOpen(true); }} 
+              className="border border-dashed border-zinc-800 rounded-lg flex flex-col items-center justify-center p-6 hover:bg-zinc-900/30 hover:border-zinc-700 transition-colors h-full min-h-[280px] group animate-fadeIn"
+            >
+              <div className="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center mb-4 group-hover:bg-zinc-800 transition-colors">
+                <Plus className="w-6 h-6 text-zinc-500 group-hover:text-zinc-200" />
+              </div>
+              <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest group-hover:text-zinc-300">Initialize Component Iteration</span>
+            </button>
+          )}
         </div>
       </div>
 

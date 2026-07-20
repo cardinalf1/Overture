@@ -33,7 +33,8 @@ export function AccessControlPanel({
   onDeleteAccountRequest
 }: AccessControlPanelProps) {
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'Team' | 'Sponsor' | 'Judge'>('Sponsor');
+  const [role, setRole] = useState<'Admin' | 'Team' | 'Sponsor' | 'Judge'>('Sponsor');
+  const [department, setDepartment] = useState<'Design' | 'Engineering' | 'PM'>('Design');
   const [password, setPassword] = useState(() => generateRandomPassword());
   const [notes, setNotes] = useState('');
   const [greenlightImmediately, setGreenlightImmediately] = useState(true);
@@ -46,7 +47,8 @@ export function AccessControlPanel({
 
   // Inline editing state variables
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
-  const [editRole, setEditRole] = useState<'Team' | 'Sponsor' | 'Judge'>('Sponsor');
+  const [editRole, setEditRole] = useState<'Admin' | 'Team' | 'Sponsor' | 'Judge'>('Sponsor');
+  const [editDepartment, setEditDepartment] = useState<'Design' | 'Engineering' | 'PM'>('Design');
   const [editPassword, setEditPassword] = useState('');
   const [editNotes, setEditNotes] = useState('');
 
@@ -55,6 +57,7 @@ export function AccessControlPanel({
     setEditRole(user.role);
     setEditPassword(user.password || '');
     setEditNotes(user.notes || '');
+    setEditDepartment(user.department || 'Design');
   };
 
   const cancelEdit = () => {
@@ -66,7 +69,8 @@ export function AccessControlPanel({
       ...user,
       role: editRole,
       password: editPassword,
-      notes: editNotes
+      notes: editNotes,
+      department: editRole === 'Admin' ? 'PM' : (editRole === 'Team' ? editDepartment : undefined)
     });
     setEditingUserId(null);
   };
@@ -90,7 +94,8 @@ export function AccessControlPanel({
       role,
       password: password.trim(),
       notes: notes || `Assigned ${role} credentials`,
-      is_greenlit: greenlightImmediately
+      is_greenlit: greenlightImmediately,
+      department: role === 'Admin' ? 'PM' : (role === 'Team' ? department : undefined)
     });
 
     setSuccessMsg(`✔ Account pre-configured for ${emailLower(email)} with designated password.`);
@@ -228,11 +233,27 @@ Please use these credentials to sign in directly.
                   onChange={(e) => setRole(e.target.value as any)}
                   className="w-full bg-black border border-zinc-900 rounded px-3 py-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-800 transition-colors"
                 >
+                  <option value="Admin">System Administrator (Admin)</option>
+                  <option value="Team">Team Member</option>
                   <option value="Sponsor">Sponsor / Partner</option>
                   <option value="Judge">Judge / Evaluator</option>
-                  <option value="Team">Team Member / Admin</option>
                 </select>
               </div>
+
+              {/* Department Select (For Team role only) */}
+              {role === 'Team' && (
+                <div className="space-y-1.5 animate-fadeIn">
+                  <label className="text-[9px] font-mono tracking-wider text-zinc-500 uppercase block">ASSIGNED DEPARTMENT</label>
+                  <select
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value as any)}
+                    className="w-full bg-black border border-zinc-900 rounded px-3 py-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-800 transition-colors"
+                  >
+                    <option value="Design">Design</option>
+                    <option value="Engineering">Engineering</option>
+                  </select>
+                </div>
+              )}
 
               {/* Notes */}
               <div className="space-y-1.5">
@@ -348,25 +369,47 @@ Please use these credentials to sign in directly.
                           </td>
                           <td className="py-3.5 pr-4">
                             {isEditing ? (
-                              <select
-                                value={editRole}
-                                onChange={(e) => setEditRole(e.target.value as any)}
-                                className="bg-black border border-zinc-900 rounded px-1.5 py-1 text-[11px] font-mono text-zinc-200 focus:outline-none focus:border-zinc-800"
-                              >
-                                <option value="Sponsor">Sponsor</option>
-                                <option value="Judge">Judge</option>
-                                <option value="Team">Team</option>
-                              </select>
+                              <div className="flex flex-col gap-1.5">
+                                <select
+                                  value={editRole}
+                                  onChange={(e) => setEditRole(e.target.value as any)}
+                                  className="bg-black border border-zinc-900 rounded px-1.5 py-1 text-[11px] font-mono text-zinc-200 focus:outline-none focus:border-zinc-800"
+                                >
+                                  <option value="Admin">Admin</option>
+                                  <option value="Team">Team</option>
+                                  <option value="Sponsor">Sponsor</option>
+                                  <option value="Judge">Judge</option>
+                                </select>
+                                {editRole === 'Team' && (
+                                  <select
+                                    value={editDepartment}
+                                    onChange={(e) => setEditDepartment(e.target.value as any)}
+                                    className="bg-black border border-zinc-900 rounded px-1.5 py-1 text-[11px] font-mono text-zinc-200 focus:outline-none focus:border-zinc-800"
+                                  >
+                                    <option value="Design">Design</option>
+                                    <option value="Engineering">Engineering</option>
+                                  </select>
+                                )}
+                              </div>
                             ) : (
-                              <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded border ${
-                                user.role === 'Team' 
-                                  ? 'bg-amber-950/20 text-amber-400 border-amber-900/40' 
-                                  : user.role === 'Sponsor'
-                                  ? 'bg-emerald-950/20 text-emerald-400 border-emerald-900/40'
-                                  : 'bg-blue-950/20 text-blue-400 border-blue-900/40'
-                              }`}>
-                                {user.role}
-                              </span>
+                              <div className="flex flex-col gap-1">
+                                <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded border text-center ${
+                                  user.role === 'Admin'
+                                    ? 'bg-purple-950/20 text-purple-400 border-purple-900/40'
+                                    : user.role === 'Team' 
+                                    ? 'bg-amber-950/20 text-amber-400 border-amber-900/40' 
+                                    : user.role === 'Sponsor'
+                                    ? 'bg-emerald-950/20 text-emerald-400 border-emerald-900/40'
+                                    : 'bg-blue-950/20 text-blue-400 border-blue-900/40'
+                                }`}>
+                                  {user.role}
+                                </span>
+                                {user.role === 'Team' && user.department && (
+                                  <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest text-center mt-0.5">
+                                    Dept: {user.department}
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </td>
                           <td className="py-3.5 pr-4 text-zinc-300">

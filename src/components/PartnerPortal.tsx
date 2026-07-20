@@ -222,7 +222,7 @@ Cardinal Overture F1 in Schools Team`;
     document.body.removeChild(link);
   };
 
-  const isTeam = role === 'Team';
+  const isTeam = role === 'Admin';
 
   // Math totals
   const totalBudgetNeeded = expenditures.reduce((acc, item) => acc + item.cost, 0);

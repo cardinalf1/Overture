@@ -78,7 +78,7 @@ export function Header({ currentRole, onRoleChange, activeModule, onModuleChange
 
         <div className="w-px h-4 bg-zinc-850"></div>
 
-        {authRole === 'Team' && (
+        {authRole === 'Admin' && (
           <div className="flex items-center gap-2">
             <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">Role:</span>
             <select 
@@ -92,8 +92,16 @@ export function Header({ currentRole, onRoleChange, activeModule, onModuleChange
             </select>
           </div>
         )}
-        <div className="w-px h-4 bg-zinc-800"></div>
         {authRole === 'Team' && (
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">Dept:</span>
+            <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-wider">
+              {currentRole}
+            </span>
+          </div>
+        )}
+        <div className="w-px h-4 bg-zinc-800"></div>
+        {authRole === 'Admin' && (
           <>
             <button onClick={onOpenSettings} title="Settings" className="text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer">
               <Settings className="w-4 h-4" />

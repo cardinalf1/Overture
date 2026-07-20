@@ -94,6 +94,7 @@ const defaultNews: NewsUpdate[] = [
 
 export default function App() {
   const { isSupabaseActive, role: authRole, user, name: authName, signOut } = useAuth();
+  const isAdmin = authRole === 'Admin';
   const [currentRole, setCurrentRole] = useState<Role>('PM');
 
   const userRef = useRef(user);
@@ -198,7 +199,7 @@ export default function App() {
     ];
   });
 
-  // Role-based Auto Module Routing
+  // Role-based Auto Module Routing & Locked Department Assignment
   useEffect(() => {
     if (authRole === 'Sponsor') {
       setActiveModule('Sponsor Portal');
@@ -206,10 +207,17 @@ export default function App() {
       setActiveModule('Judge Portal');
     } else if (authRole === 'Guest') {
       setActiveModule('Progress & Timeline');
+    } else if (authRole === 'Admin') {
+      setCurrentRole('PM');
+      setActiveModule('Command Center');
+    } else if (authRole === 'Team') {
+      const userDept = user?.user_metadata?.department || 'Design';
+      setCurrentRole(userDept as Role);
+      setActiveModule('Command Center');
     } else {
       setActiveModule('Command Center');
     }
-  }, [authRole]);
+  }, [authRole, user]);
 
   // Fetch from Supabase on mount (if configured)
   useEffect(() => {
@@ -523,12 +531,15 @@ export default function App() {
   };
 
   const handleDeleteNode = (id: string) => {
-    if (currentRole !== 'PM') return;
-    setNodes(prev => prev.filter(n => n.id !== id));
+    if (!isAdmin) return;
+    if (!isSupabaseActive) {
+      setNodes(prev => prev.filter(n => n.id !== id));
+    }
     supabaseService.deleteNode(id).catch(console.error);
   };
 
   const handleCreateNode = (nodeData: { title: string; description: string; department: Department; planned_start: string; planned_end: string; dependency?: string; assigned_to?: string | null }) => {
+    if (!isAdmin) return;
     const maxIdNum = nodes.reduce((max, node) => {
       const match = node.id.match(/^(?:ND|N)-(\d+)$/);
       if (match) {
@@ -547,29 +558,37 @@ export default function App() {
       actual_end: null,
     };
     
-    setNodes(prev => [...prev, newNode]);
+    if (!isSupabaseActive) {
+      setNodes(prev => [...prev, newNode]);
+    }
     supabaseService.upsertNode(newNode).catch(console.error);
   };
 
   const handleAssignTodo = (id: string, assignedTo: string | null) => {
-    setNodes(prev => prev.map(n => {
-      if (n.id === id) {
-        const updated = { ...n, assigned_to: assignedTo };
-        supabaseService.upsertNode(updated).catch(console.error);
-        return updated;
-      }
-      return n;
-    }));
+    if (!isAdmin) return;
+    const target = nodes.find(n => n.id === id);
+    if (!target) return;
+    const updated = { ...target, assigned_to: assignedTo };
+
+    if (!isSupabaseActive) {
+      setNodes(prev => prev.map(n => n.id === id ? updated : n));
+    }
+    supabaseService.upsertNode(updated).catch(console.error);
   };
 
   const handleEditTodo = (id: string, updatedTodo: Node) => {
-    setNodes(prev => prev.map(n => n.id === id ? updatedTodo : n));
+    if (!isAdmin) return;
+    if (!isSupabaseActive) {
+      setNodes(prev => prev.map(n => n.id === id ? updatedTodo : n));
+    }
     supabaseService.upsertNode(updatedTodo).catch(console.error);
   };
 
   // EXPENDITURE HANDLERS
   const handleAddExpenditure = (itemData: Omit<ExpenditureItem, 'id' | 'pledged_by_email' | 'pledged_by_name'>) => {
-    const newId = `EXP-${String(expenditures.length + 1).padStart(3, '0')}`;
+    if (!isAdmin) return;
+    // Generate unique ID to prevent database collisions and overwriting preceding items
+    const newId = `EXP-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const newItem: ExpenditureItem = {
       id: newId,
       ...itemData,
@@ -577,12 +596,17 @@ export default function App() {
       pledged_by_name: null
     };
 
-    setExpenditures(prev => [newItem, ...prev]);
+    if (!isSupabaseActive) {
+      setExpenditures(prev => [newItem, ...prev]);
+    }
     supabaseService.upsertExpenditure(newItem).catch(console.error);
   };
 
   const handleDeleteExpenditure = (id: string) => {
-    setExpenditures(prev => prev.filter(e => e.id !== id));
+    if (!isAdmin) return;
+    if (!isSupabaseActive) {
+      setExpenditures(prev => prev.filter(e => e.id !== id));
+    }
     supabaseService.deleteExpenditure(id).catch(console.error);
   };
 
@@ -610,27 +634,33 @@ export default function App() {
 
   // SPONSOR COMMITMENT HANDLERS
   const handleAddSponsorCommitment = (commitment: Omit<SponsorCommitment, 'id'>) => {
+    if (!isAdmin) return;
     const newCommitment: SponsorCommitment = {
       ...commitment,
       id: `commit-${Date.now()}`
     };
-    setSponsorCommitments(prev => [...prev, newCommitment].sort((a, b) => (a.due_date || '').localeCompare(b.due_date || '')));
+    if (!isSupabaseActive) {
+      setSponsorCommitments(prev => [...prev, newCommitment].sort((a, b) => (a.due_date || '').localeCompare(b.due_date || '')));
+    }
     supabaseService.upsertSponsorCommitment(newCommitment).catch(console.error);
   };
 
   const handleUpdateSponsorCommitmentStatus = (id: string, status: SponsorCommitment['status']) => {
-    setSponsorCommitments(prev => prev.map(c => {
-      if (c.id === id) {
-        const updated = { ...c, status };
-        supabaseService.upsertSponsorCommitment(updated).catch(console.error);
-        return updated;
-      }
-      return c;
-    }));
+    if (!isAdmin) return;
+    const target = sponsorCommitments.find(c => c.id === id);
+    if (!target) return;
+    const updated = { ...target, status };
+    if (!isSupabaseActive) {
+      setSponsorCommitments(prev => prev.map(c => c.id === id ? updated : c));
+    }
+    supabaseService.upsertSponsorCommitment(updated).catch(console.error);
   };
 
   const handleDeleteSponsorCommitment = (id: string) => {
-    setSponsorCommitments(prev => prev.filter(c => c.id !== id));
+    if (!isAdmin) return;
+    if (!isSupabaseActive) {
+      setSponsorCommitments(prev => prev.filter(c => c.id !== id));
+    }
     supabaseService.deleteSponsorCommitment(id).catch(console.error);
   };
 
@@ -707,30 +737,40 @@ Cardinal Overture F1 in Schools Team
 
   // CAD ITERATIONS HUB PULLED-UP HANDLERS
   const handleCreateIteration = (newIter: CadIteration) => {
-    setIterations([...iterations, newIter]);
+    if (!isAdmin) return;
+    if (!isSupabaseActive) {
+      setIterations([...iterations, newIter]);
+    }
     supabaseService.upsertIteration(newIter).catch(console.error);
   };
 
   const handleEditIteration = (id: string, updatedIter: CadIteration) => {
-    setIterations(prev => prev.map(iter => iter.id === id ? updatedIter : iter));
+    if (!isAdmin) return;
+    if (!isSupabaseActive) {
+      setIterations(prev => prev.map(iter => iter.id === id ? updatedIter : iter));
+    }
     supabaseService.upsertIteration(updatedIter).catch(console.error);
   };
 
   const handleDeleteIteration = (id: string) => {
-    setIterations(prev => prev.filter(iter => iter.id !== id));
+    if (!isAdmin) return;
+    if (!isSupabaseActive) {
+      setIterations(prev => prev.filter(iter => iter.id !== id));
+    }
     supabaseService.deleteIteration(id).catch(console.error);
   };
 
   const handleUploadModel = async (id: string, file: File) => {
+    if (!isAdmin) return;
     const url = await supabaseService.uploadModelFile(file);
     const existing = iterations.find(iter => iter.id === id);
     if (existing) {
       const updatedIter = { ...existing, model_url: url, model_name: file.name };
+      if (!isSupabaseActive) {
+        setIterations(prev => prev.map(iter => iter.id === id ? updatedIter : iter));
+      }
       supabaseService.upsertIteration(updatedIter).catch(console.error);
     }
-    setIterations(prev => prev.map(iter => 
-      iter.id === id ? { ...iter, model_url: url, model_name: file.name } : iter
-    ));
   };
 
   // AUTHORIZED USERS ACCESS HANDLERS
@@ -867,7 +907,7 @@ Cardinal Overture F1 in Schools Team
                     onUpdateStatus={handleUpdateStatus}
                     onDeleteNode={handleDeleteNode}
                     onOpenCreateModal={() => setIsCreateModalOpen(true)}
-                    isReadOnly={false}
+                    isReadOnly={!isAdmin}
                   />
                 </div>
                 <div className="h-full">
@@ -886,6 +926,7 @@ Cardinal Overture F1 in Schools Team
               onEditIteration={handleEditIteration}
               onDeleteIteration={handleDeleteIteration}
               onUploadIterationModel={handleUploadModel}
+              isAdmin={isAdmin}
             />
           </div>
         )}
@@ -911,6 +952,7 @@ Cardinal Overture F1 in Schools Team
             onEditIteration={handleEditIteration}
             onDeleteIteration={handleDeleteIteration}
             onUploadIterationModel={handleUploadModel}
+            isAdmin={isAdmin}
           />
         )}
 
@@ -924,6 +966,7 @@ Cardinal Overture F1 in Schools Team
             onDeleteTodo={handleDeleteNode}
             onAssignTodo={handleAssignTodo}
             onEditTodo={handleEditTodo}
+            isAdmin={isAdmin}
           />
         )}
 

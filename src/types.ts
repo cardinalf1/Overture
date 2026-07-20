@@ -56,11 +56,12 @@ export interface NewsUpdate {
 export interface AuthorizedUser {
   id: string;
   email: string;
-  role: 'Team' | 'Sponsor' | 'Judge';
+  role: 'Admin' | 'Team' | 'Sponsor' | 'Judge';
   password?: string;
   notes?: string;
   created_at?: string;
   is_greenlit?: boolean;
+  department?: 'Design' | 'Engineering' | 'PM';
 }
 
 export interface SponsorCommitment {

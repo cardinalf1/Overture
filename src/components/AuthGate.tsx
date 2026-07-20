@@ -72,6 +72,7 @@ export function AuthGate({ children }: AuthGateProps) {
                   ...session.user.user_metadata,
                   role: matchedUser.role,
                   name: matchedUser.notes || session.user.email?.split('@')[0],
+                  department: matchedUser.department || 'Design',
                 }
               });
             }
@@ -111,6 +112,7 @@ export function AuthGate({ children }: AuthGateProps) {
                   ...session.user.user_metadata,
                   role: matchedUser.role,
                   name: matchedUser.notes || session.user.email?.split('@')[0],
+                  department: matchedUser.department || 'Design',
                 }
               });
             }
@@ -144,10 +146,27 @@ export function AuthGate({ children }: AuthGateProps) {
       if (!isSupabaseConfigured || !supabase) {
         // Local simulation / offline development fallback login
         setTimeout(() => {
-          let mockRole: 'Team' | 'Sponsor' | 'Judge' = 'Team';
+          let mockRole: 'Admin' | 'Team' | 'Sponsor' | 'Judge' = 'Team';
           let mockName = emailLower.split('@')[0];
+          let mockDept: 'Design' | 'Engineering' | 'PM' = 'Design';
           
-          if (emailLower.includes('sponsor')) {
+          if (emailLower === 'contact@cardinalsystems.org' || emailLower === 'raghav@cardinalsystems.org') {
+            mockRole = 'Admin';
+            mockDept = 'PM';
+            mockName = emailLower === 'raghav@cardinalsystems.org' ? 'Raghav' : 'Contact Admin';
+          } else if (emailLower === 'manthan@cardinalsystems.org') {
+            mockRole = 'Team';
+            mockDept = 'Design';
+            mockName = 'Manthan';
+          } else if (emailLower === 'neel@cardinalsystems.org') {
+            mockRole = 'Team';
+            mockDept = 'Engineering';
+            mockName = 'Neel';
+          } else if (emailLower === 'rudra@cardinalsystems.org') {
+            mockRole = 'Team';
+            mockDept = 'Design';
+            mockName = 'Rudra';
+          } else if (emailLower.includes('sponsor')) {
             mockRole = 'Sponsor';
             mockName = 'Autodesk (Partner)';
           } else if (emailLower.includes('judge') || emailLower.includes('evaluator')) {
@@ -163,7 +182,8 @@ export function AuthGate({ children }: AuthGateProps) {
             email: emailLower,
             user_metadata: {
               role: mockRole,
-              name: mockName
+              name: mockName,
+              department: mockDept
             },
             isCustom: true
           };
@@ -198,6 +218,7 @@ export function AuthGate({ children }: AuthGateProps) {
             data: {
               role: matchedUser.role,
               name: matchedUser.notes || email.split('@')[0],
+              department: matchedUser.department || 'Design',
             }
           }
         });
@@ -214,6 +235,7 @@ export function AuthGate({ children }: AuthGateProps) {
               ...data.user.user_metadata,
               role: matchedUser.role,
               name: matchedUser.notes || email.split('@')[0],
+              department: matchedUser.department || 'Design',
             }
           });
         }
@@ -236,7 +258,8 @@ export function AuthGate({ children }: AuthGateProps) {
                 email: matchedUser.email,
                 user_metadata: {
                   role: matchedUser.role,
-                  name: matchedUser.notes || matchedUser.email.split('@')[0]
+                  name: matchedUser.notes || matchedUser.email.split('@')[0],
+                  department: matchedUser.department || 'Design',
                 },
                 isCustom: true
               };
@@ -286,6 +309,7 @@ export function AuthGate({ children }: AuthGateProps) {
             ...data.user.user_metadata,
             role: matchedUser.role,
             name: matchedUser.notes || data.user.email?.split('@')[0],
+            department: matchedUser.department || 'Design',
           }
         });
       }
@@ -304,6 +328,9 @@ export function AuthGate({ children }: AuthGateProps) {
     setUser(null);
     setBypassAuth(false);
     setIsLoggingIn(false);
+    setEmail('');
+    setPassword('');
+    setDisplayName('');
   };
 
   if (loading) {

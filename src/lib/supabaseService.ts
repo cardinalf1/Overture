@@ -275,7 +275,8 @@ export const supabaseService = {
           password: user.password || '',
           notes: user.notes || '',
           created_at: user.created_at || new Date().toISOString(),
-          is_greenlit: user.is_greenlit ?? false
+          is_greenlit: user.is_greenlit ?? false,
+          department: user.department || null
         });
       if (error) throw error;
     } catch (e) {

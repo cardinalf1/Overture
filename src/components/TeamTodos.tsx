@@ -12,6 +12,7 @@ interface TeamTodosProps {
   onDeleteTodo: (id: string) => void;
   onAssignTodo: (id: string, assignedTo: string | null) => void;
   onEditTodo: (id: string, updatedTodo: Node) => void;
+  isAdmin: boolean;
 }
 
 export function TeamTodos({
@@ -23,6 +24,7 @@ export function TeamTodos({
   onDeleteTodo,
   onAssignTodo,
   onEditTodo,
+  isAdmin,
 }: TeamTodosProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [title, setTitle] = useState('');
@@ -111,13 +113,15 @@ export function TeamTodos({
           <h2 className="text-sm font-mono font-bold text-zinc-100 tracking-wider uppercase">Operational To-Dos & Campaign Assignments</h2>
         </div>
         
-        <button
-          onClick={() => setIsAdding(!isAdding)}
-          className="flex items-center gap-2 text-xs font-mono bg-zinc-100 hover:bg-white text-black px-4 py-2 rounded font-bold transition-colors"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          {isAdding ? 'CANCEL' : 'ADD TO-DO'}
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setIsAdding(!isAdding)}
+            className="flex items-center gap-2 text-xs font-mono bg-zinc-100 hover:bg-white text-black px-4 py-2 rounded font-bold transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            {isAdding ? 'CANCEL' : 'ADD TO-DO'}
+          </button>
+        )}
       </div>
 
       <AnimatePresence>
@@ -370,49 +374,70 @@ export function TeamTodos({
                       <span>{node.planned_start} ➔ {node.planned_end}</span>
                     </div>
                   </td>
-                  <td className="py-3.5 pr-4">
-                    <div className="flex items-center gap-2">
-                      <User className="w-3.5 h-3.5 text-zinc-500" />
+                  <td className="py-3.5 pr-4 text-zinc-400 text-[11px]">
+                    {isAdmin ? (
                       <select
                         value={node.assigned_to || ''}
                         onChange={(e) => onAssignTodo(node.id, e.target.value || null)}
-                        className="bg-zinc-950 border border-zinc-900 rounded text-zinc-300 text-[11px] px-2 py-1 outline-none cursor-pointer"
+                        className="bg-zinc-950 border border-zinc-900 rounded text-zinc-350 text-[11px] px-2 py-1 outline-none max-w-[120px] cursor-pointer"
                       >
                         <option value="">Unassigned</option>
                         {teamMembers.map(u => (
                           <option key={u.email} value={u.email}>{u.notes || u.email}</option>
                         ))}
                       </select>
-                    </div>
+                    ) : (
+                      <span>
+                        {node.assigned_to 
+                          ? (teamMembers.find(t => t.email === node.assigned_to)?.notes || node.assigned_to)
+                          : 'Unassigned'}
+                      </span>
+                    )}
                   </td>
                   <td className="py-3.5 pr-4">
-                    <select
-                      value={node.status}
-                      onChange={(e) => onUpdateStatus(node.id, e.target.value as Status)}
-                      className="bg-zinc-950 border border-zinc-900 rounded text-zinc-300 text-[11px] px-2 py-1 outline-none cursor-pointer"
-                    >
-                      <option value="To Do">To Do</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Completed">Completed</option>
-                    </select>
+                    {isAdmin || node.department === currentRole || node.department === 'Everyone' ? (
+                      <select
+                        value={node.status}
+                        onChange={(e) => onUpdateStatus(node.id, e.target.value as Status)}
+                        className="bg-zinc-950 border border-zinc-900 rounded text-zinc-300 text-[11px] px-2 py-1 outline-none cursor-pointer"
+                      >
+                        <option value="To Do">To Do</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Completed">Completed</option>
+                      </select>
+                    ) : (
+                      <span className={`px-2 py-1 rounded text-[10px] uppercase tracking-wider font-bold border ${
+                        node.status === 'Completed' 
+                           ? 'text-emerald-400 bg-emerald-950/20 border-emerald-900/40' 
+                           : node.status === 'In Progress'
+                             ? 'text-amber-400 bg-amber-950/20 border-amber-900/40'
+                             : 'text-zinc-550 bg-zinc-900/30 border-zinc-800/40'
+                      }`}>
+                        {node.status}
+                      </span>
+                    )}
                   </td>
-                  <td className="py-3.5 text-right">
-                    <div className="flex justify-end gap-1.5">
-                      <button
-                        onClick={() => startEditing(node)}
-                        className="text-zinc-400 hover:text-white p-1.5 hover:bg-zinc-900 border border-transparent hover:border-zinc-800 rounded transition-all cursor-pointer"
-                        title="Edit Task"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => onDeleteTodo(node.id)}
-                        className="text-zinc-600 hover:text-rose-450 p-1.5 hover:bg-rose-950/20 border border-transparent hover:border-rose-900/30 rounded transition-all cursor-pointer"
-                        title="Delete Task"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                  <td className="py-3.5 text-right font-mono">
+                    {isAdmin ? (
+                      <div className="flex justify-end gap-1.5">
+                        <button
+                           onClick={() => startEditing(node)}
+                           className="text-zinc-400 hover:text-white p-1.5 hover:bg-zinc-900 border border-transparent hover:border-zinc-800 rounded transition-all cursor-pointer"
+                           title="Edit Task"
+                         >
+                           <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                           onClick={() => onDeleteTodo(node.id)}
+                           className="text-zinc-600 hover:text-rose-450 p-1.5 hover:bg-rose-950/20 border border-transparent hover:border-rose-900/30 rounded transition-all cursor-pointer"
+                           title="Delete Task"
+                         >
+                           <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-zinc-800">--</span>
+                    )}
                   </td>
                 </tr>
               );
