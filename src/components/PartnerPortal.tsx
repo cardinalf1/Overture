@@ -32,6 +32,7 @@ interface PartnerPortalProps {
   onEditIteration: (id: string, iter: Omit<CadIteration, 'id'>) => void;
   onDeleteIteration: (id: string) => void;
   onUploadIterationModel: (id: string, file: File) => void;
+  isAdmin?: boolean;
 }
 
 export function PartnerPortal({
@@ -53,7 +54,8 @@ export function PartnerPortal({
   onAddIteration,
   onEditIteration,
   onDeleteIteration,
-  onUploadIterationModel
+  onUploadIterationModel,
+  isAdmin = false
 }: PartnerPortalProps) {
   const { user, role, name: currentSponsorName } = useAuth();
 

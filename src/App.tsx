@@ -911,7 +911,7 @@ Cardinal Overture F1 in Schools Team
                   />
                 </div>
                 <div className="h-full">
-                  <GanttChart nodes={visibleNodes} simulatedDate={simulatedDate} />
+                  <GanttChart nodes={nodes} simulatedDate={simulatedDate} />
                 </div>
               </div>
             </>

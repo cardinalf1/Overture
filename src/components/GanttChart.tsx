@@ -60,106 +60,86 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
 
   const totalWidth = LEFT_PANEL_WIDTH + (totalDays * DAY_WIDTH);
 
-  const grouped = nodes.reduce((acc, node) => {
-    if (!acc[node.department]) acc[node.department] = [];
-    acc[node.department].push(node);
-    return acc;
-  }, {} as Record<string, Node[]>);
-
   let currentY = HEADER_HEIGHT;
   const svgElements: React.JSX.Element[] = [];
 
-  Object.entries(grouped).forEach(([dept, deptNodes]) => {
-    // Department Header
+  nodes.forEach(node => {
+    const plannedX = getX(node.planned_start);
+    const plannedW = getW(node.planned_start, node.planned_end);
+
+    const actualStart = node.actual_start || node.planned_start;
+    const actualEnd = node.actual_end || (node.status === 'In Progress' ? simulatedDate : actualStart);
+    const actualX = getX(actualStart);
+    const actualW = getW(actualStart, actualEnd);
+
+    const bgColor = DEPT_COLORS[node.department as Department] || '#71717a';
+    const textColor = node.department === 'PM' || node.department === 'Design' ? '#000000' : '#ffffff';
+
+    let durationText = '';
+    if (node.actual_start) {
+      const days = getDaysDiff(node.actual_start, node.actual_end || simulatedDate) + 1;
+      durationText = node.actual_end ? `${days}d` : `${days}d (ip)`;
+    }
+
     svgElements.push(
-      <g key={`dept-${dept}`}>
-        <rect x={0} y={currentY} width={totalWidth} height={DEPT_HEADER_HEIGHT} fill="#09090b" />
-        <text x={10} y={currentY + 16} fill="#71717a" fontSize="10" fontFamily="monospace" letterSpacing="2">
-          // {dept.toUpperCase()}
+      <g key={`node-${node.id}`} style={{ cursor: 'pointer' }} onClick={() => setSelectedNode(node)}>
+        {/* Row Background */}
+        <rect x={0} y={currentY} width={totalWidth} height={ROW_HEIGHT} fill="none" />
+        <line x1={0} y1={currentY + ROW_HEIGHT} x2={totalWidth} y2={currentY + ROW_HEIGHT} stroke="#18181b" strokeWidth="1" />
+
+        {/* Left Panel ID */}
+        <rect x={0} y={currentY} width={LEFT_PANEL_WIDTH} height={ROW_HEIGHT} fill="#000000" />
+        <text x={10} y={currentY + 36} fill="#71717a" fontSize="10" fontFamily="monospace">{node.id}</text>
+        <line x1={LEFT_PANEL_WIDTH} y1={currentY} x2={LEFT_PANEL_WIDTH} y2={currentY + ROW_HEIGHT} stroke="#27272a" strokeWidth="1" />
+
+        {/* Task Name (Always above bars, anchored to planned start) */}
+        <text
+          x={plannedX}
+          y={currentY + 18}
+          fill="#e4e4e7"
+          fontSize="10"
+          fontFamily="monospace"
+          fontWeight="bold"
+        >
+          [{node.department.toUpperCase()}] {node.title} {node.dependency && `[DEP: ${node.dependency}]`}
         </text>
-        <line x1={0} y1={currentY + DEPT_HEADER_HEIGHT} x2={totalWidth} y2={currentY + DEPT_HEADER_HEIGHT} stroke="#27272a" strokeWidth="1" />
+
+        {/* Planned Bar */}
+        <rect
+          x={plannedX}
+          y={currentY + 26}
+          width={plannedW}
+          height={8}
+          fill="#27272a"
+          rx="4"
+        />
+
+        {/* Actual Bar */}
+        {node.actual_start && (
+          <g>
+            <rect
+              x={actualX}
+              y={currentY + 38}
+              width={actualW}
+              height={18}
+              fill={bgColor}
+              rx="5"
+            />
+            <text
+              x={actualX + 6}
+              y={currentY + 50}
+              fill={textColor}
+              fontSize="9"
+              fontFamily="monospace"
+              fontWeight="bold"
+            >
+              {durationText}
+            </text>
+          </g>
+        )}
       </g>
     );
-    currentY += DEPT_HEADER_HEIGHT;
-
-    deptNodes.forEach(node => {
-      const plannedX = getX(node.planned_start);
-      const plannedW = getW(node.planned_start, node.planned_end);
-
-      const actualStart = node.actual_start || node.planned_start;
-      const actualEnd = node.actual_end || (node.status === 'In Progress' ? simulatedDate : actualStart);
-      const actualX = getX(actualStart);
-      const actualW = getW(actualStart, actualEnd);
-
-      const bgColor = DEPT_COLORS[node.department as Department] || '#71717a';
-      const textColor = node.department === 'PM' || node.department === 'Design' ? '#000000' : '#ffffff';
-
-      let durationText = '';
-      if (node.actual_start) {
-        const days = getDaysDiff(node.actual_start, node.actual_end || simulatedDate) + 1;
-        durationText = node.actual_end ? `${days}d` : `${days}d (ip)`;
-      }
-
-      svgElements.push(
-        <g key={`node-${node.id}`} style={{ cursor: 'pointer' }} onClick={() => setSelectedNode(node)}>
-          {/* Row Background */}
-          <rect x={0} y={currentY} width={totalWidth} height={ROW_HEIGHT} fill="none" />
-          <line x1={0} y1={currentY + ROW_HEIGHT} x2={totalWidth} y2={currentY + ROW_HEIGHT} stroke="#18181b" strokeWidth="1" />
-
-          {/* Left Panel ID */}
-          <rect x={0} y={currentY} width={LEFT_PANEL_WIDTH} height={ROW_HEIGHT} fill="#000000" />
-          <text x={10} y={currentY + 36} fill="#71717a" fontSize="10" fontFamily="monospace">{node.id}</text>
-          <line x1={LEFT_PANEL_WIDTH} y1={currentY} x2={LEFT_PANEL_WIDTH} y2={currentY + ROW_HEIGHT} stroke="#27272a" strokeWidth="1" />
-
-          {/* Task Name (Always above bars, anchored to planned start) */}
-          <text
-            x={plannedX}
-            y={currentY + 18}
-            fill="#e4e4e7"
-            fontSize="10"
-            fontFamily="monospace"
-            fontWeight="bold"
-          >
-            {node.title} {node.dependency && `[DEP: ${node.dependency}]`}
-          </text>
-
-          {/* Planned Bar */}
-          <rect
-            x={plannedX}
-            y={currentY + 26}
-            width={plannedW}
-            height={8}
-            fill="#27272a"
-            rx="4"
-          />
-
-          {/* Actual Bar */}
-          {node.actual_start && (
-            <g>
-              <rect
-                x={actualX}
-                y={currentY + 38}
-                width={actualW}
-                height={18}
-                fill={bgColor}
-                rx="5"
-              />
-              <text
-                x={actualX + 6}
-                y={currentY + 50}
-                fill={textColor}
-                fontSize="9"
-                fontFamily="monospace"
-                fontWeight="bold"
-              >
-                {durationText}
-              </text>
-            </g>
-          )}
-        </g>
-      );
-      currentY += ROW_HEIGHT;
-    });
+    currentY += ROW_HEIGHT;
   });
 
   const totalHeight = currentY;

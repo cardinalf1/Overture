@@ -540,7 +540,7 @@ interface AuthContextType {
   user: any;
   signOut: () => Promise<void>;
   isSupabaseActive: boolean;
-  role: 'Team' | 'Sponsor' | 'Judge' | 'Guest';
+  role: 'Admin' | 'Team' | 'Sponsor' | 'Judge' | 'Guest';
   name: string;
   isLoggingIn: boolean;
   setIsLoggingIn: (val: boolean) => void;
