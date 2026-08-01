@@ -19,11 +19,11 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
   // Scaled-up presentation dimensions based on example.svg architecture
-  const DAY_WIDTH = 64;
-  const ROW_HEIGHT = 72;
-  const HEADER_HEIGHT = 48;
-  const LEFT_PANEL_WIDTH = 90;
-  const DEPT_HEADER_HEIGHT = 28;
+  const DAY_WIDTH = 72;
+  const ROW_HEIGHT = 88;
+  const HEADER_HEIGHT = 54;
+  const LEFT_PANEL_WIDTH = 110;
+  const DEPT_HEADER_HEIGHT = 34;
 
   // Date Math Helpers
   const parseDate = (d: string) => new Date(d).getTime();
@@ -77,17 +77,17 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
       <g key={`dept-${dept}`}>
         <rect x={0} y={currentY} width={totalWidth} height={DEPT_HEADER_HEIGHT} fill="#09090b" />
         <text
-          x={12}
-          y={currentY + 19}
+          x={14}
+          y={currentY + 23}
           fill="#71717a"
-          fontSize="12"
+          fontSize="16"
           fontFamily="monospace"
           fontWeight="bold"
           letterSpacing="2"
         >
           // {dept.toUpperCase()}
         </text>
-        <line x1={0} y1={currentY + DEPT_HEADER_HEIGHT} x2={totalWidth} y2={currentY + DEPT_HEADER_HEIGHT} stroke="#27272a" strokeWidth="1" />
+        <line x1={0} y1={currentY + DEPT_HEADER_HEIGHT} x2={totalWidth} y2={currentY + DEPT_HEADER_HEIGHT} stroke="#27272a" strokeWidth="1.5" />
       </g>
     );
     currentY += DEPT_HEADER_HEIGHT;
@@ -118,15 +118,15 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
 
           {/* Left Panel ID */}
           <rect x={0} y={currentY} width={LEFT_PANEL_WIDTH} height={ROW_HEIGHT} fill="#000000" />
-          <text x={12} y={currentY + 42} fill="#71717a" fontSize="12" fontFamily="monospace" fontWeight="bold">{node.id}</text>
-          <line x1={LEFT_PANEL_WIDTH} y1={currentY} x2={LEFT_PANEL_WIDTH} y2={currentY + ROW_HEIGHT} stroke="#27272a" strokeWidth="1" />
+          <text x={14} y={currentY + 52} fill="#71717a" fontSize="16" fontFamily="monospace" fontWeight="bold">{node.id}</text>
+          <line x1={LEFT_PANEL_WIDTH} y1={currentY} x2={LEFT_PANEL_WIDTH} y2={currentY + ROW_HEIGHT} stroke="#27272a" strokeWidth="1.5" />
 
           {/* Task Name Title (Above bars, anchored to planned start) */}
           <text
             x={plannedX}
-            y={currentY + 22}
-            fill="#e4e4e7"
-            fontSize="13"
+            y={currentY + 28}
+            fill="#ffffff"
+            fontSize="18"
             fontFamily="monospace"
             fontWeight="bold"
           >
@@ -136,9 +136,9 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
           {/* Planned Bar */}
           <rect
             x={plannedX}
-            y={currentY + 30}
+            y={currentY + 36}
             width={plannedW}
-            height={10}
+            height={12}
             fill="#27272a"
             rx="4"
           />
@@ -148,17 +148,17 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             <g>
               <rect
                 x={actualX}
-                y={currentY + 44}
+                y={currentY + 52}
                 width={actualW}
-                height={20}
+                height={26}
                 fill={bgColor}
-                rx="5"
+                rx="6"
               />
               <text
-                x={actualX + 8}
-                y={currentY + 58}
+                x={actualX + 10}
+                y={currentY + 70}
                 fill={textColor}
-                fontSize="11"
+                fontSize="14"
                 fontFamily="monospace"
                 fontWeight="bold"
               >
@@ -184,7 +184,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'cardinal-gantt-export.svg';
+    link.download = 'cardinal-gantt-export-large.svg';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -197,20 +197,20 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
       {/* Header Bar */}
       <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950 shrink-0">
         <div>
-          <h2 className="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold">
+          <h2 className="text-sm font-mono uppercase tracking-wider text-zinc-200 font-bold">
             Active Gantt / Timeline ({nodes.length} Nodes)
           </h2>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex gap-4 text-[10px] font-mono text-zinc-500">
-            <div className="flex items-center gap-2"><div className="w-4 h-1.5 bg-zinc-800 rounded-full"></div> Planned</div>
-            <div className="flex items-center gap-2"><div className="w-4 h-2 bg-zinc-300 rounded-full"></div> Actual</div>
+          <div className="flex gap-4 text-xs font-mono text-zinc-400">
+            <div className="flex items-center gap-2"><div className="w-4 h-2 bg-zinc-100 rounded-sm"></div> Planned</div>
+            <div className="flex items-center gap-2"><div className="w-4 h-2.5 bg-zinc-400 rounded-sm"></div> Actual</div>
           </div>
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 text-[10px] font-mono bg-zinc-900 text-zinc-300 px-3 py-1.5 rounded hover:bg-zinc-800 hover:text-white transition-colors border border-zinc-800 cursor-pointer"
+            className="flex items-center gap-2 text-xs font-mono bg-zinc-100 text-black px-4 py-2 rounded hover:bg-white transition-colors font-bold tracking-wider cursor-pointer shadow-lg"
           >
-            <Download className="w-3.5 h-3.5" />
+            <Download className="w-4 h-4" />
             EXPORT SVG
           </button>
         </div>
@@ -236,7 +236,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
                 x2={LEFT_PANEL_WIDTH + i * DAY_WIDTH}
                 y2={totalHeight}
                 stroke="#18181b"
-                strokeWidth="1"
+                strokeWidth="1.5"
               />
             ))}
           </g>
@@ -249,22 +249,22 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
               x2={simulatedX}
               y2={totalHeight}
               stroke="#ef4444"
-              strokeWidth="2"
+              strokeWidth="2.5"
               strokeDasharray="4 4"
             />
             <rect
-              x={simulatedX - 24}
-              y={HEADER_HEIGHT + 4}
-              width={48}
-              height={16}
+              x={simulatedX - 28}
+              y={HEADER_HEIGHT + 5}
+              width={56}
+              height={20}
               fill="#ef4444"
-              rx="2"
+              rx="4"
             />
             <text
               x={simulatedX}
-              y={HEADER_HEIGHT + 15}
+              y={HEADER_HEIGHT + 19}
               fill="#ffffff"
-              fontSize="9"
+              fontSize="12"
               fontFamily="monospace"
               fontWeight="bold"
               textAnchor="middle"
@@ -276,7 +276,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
           {/* Top Date Header */}
           <g>
             <rect x={0} y={0} width={totalWidth} height={HEADER_HEIGHT} fill="#000000" />
-            <line x1={0} y1={HEADER_HEIGHT} x2={totalWidth} y2={HEADER_HEIGHT} stroke="#27272a" strokeWidth="1" />
+            <line x1={0} y1={HEADER_HEIGHT} x2={totalWidth} y2={HEADER_HEIGHT} stroke="#27272a" strokeWidth="1.5" />
             {days.map((day, i) => {
               const dateObj = new Date(day);
               const formattedDate = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
@@ -284,9 +284,9 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
                 <text
                   key={`header-${day}`}
                   x={LEFT_PANEL_WIDTH + i * DAY_WIDTH + (DAY_WIDTH / 2)}
-                  y={28}
+                  y={32}
                   fill="#71717a"
-                  fontSize="12"
+                  fontSize="15"
                   fontFamily="monospace"
                   fontWeight="bold"
                   textAnchor="middle"
