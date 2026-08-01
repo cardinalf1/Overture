@@ -8,21 +8,22 @@ interface GanttChartProps {
 }
 
 const DEPT_COLORS: Record<Department, string> = {
-  PM: '#38bdf8', // Sky Blue
-  Design: '#a855f7', // Purple
-  Engineering: '#f43f5e', // Rose
-  Everyone: '#10b981', // Emerald
+  PM: '#f4f4f5', // zinc-100
+  Design: '#d4d4d8', // zinc-300
+  Engineering: '#71717a', // zinc-500
+  Everyone: '#3f3f46', // zinc-700
 };
 
 export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
-  // Large Presentation Scales
-  const DAY_WIDTH = 90;
-  const ROW_HEIGHT = 90;
-  const HEADER_HEIGHT = 56;
-  const LEFT_PANEL_WIDTH = 130;
+  // Scaled-up presentation dimensions based on example.svg architecture
+  const DAY_WIDTH = 64;
+  const ROW_HEIGHT = 72;
+  const HEADER_HEIGHT = 48;
+  const LEFT_PANEL_WIDTH = 90;
+  const DEPT_HEADER_HEIGHT = 28;
 
   // Date Math Helpers
   const parseDate = (d: string) => new Date(d).getTime();
@@ -60,86 +61,130 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
 
   const totalWidth = LEFT_PANEL_WIDTH + (totalDays * DAY_WIDTH);
 
-  // --- COMPACT TRACK PACKING ALGORITHM ---
-  const getStartMs = (node: Node) => {
-    const p = parseDate(node.planned_start);
-    const a = node.actual_start ? parseDate(node.actual_start) : Infinity;
-    return Math.min(p, a);
-  };
+  // Group nodes by department (like example.svg)
+  const grouped = nodes.reduce((acc, node) => {
+    if (!acc[node.department]) acc[node.department] = [];
+    acc[node.department].push(node);
+    return acc;
+  }, {} as Record<string, Node[]>);
 
-  const getEndMs = (node: Node) => {
-    const p = parseDate(node.planned_end);
-    const a = node.actual_end ? parseDate(node.actual_end) : (node.status === 'In Progress' ? simulatedTime : p);
-    return Math.max(p, a);
-  };
+  let currentY = HEADER_HEIGHT;
+  const svgElements: React.JSX.Element[] = [];
 
-  const sortedNodes = [...nodes].sort((a, b) => {
-    const startDiff = getStartMs(a) - getStartMs(b);
-    if (startDiff !== 0) return startDiff;
-    return getEndMs(a) - getEndMs(b);
-  });
+  Object.entries(grouped).forEach(([dept, deptNodes]) => {
+    // Department Header Row
+    svgElements.push(
+      <g key={`dept-${dept}`}>
+        <rect x={0} y={currentY} width={totalWidth} height={DEPT_HEADER_HEIGHT} fill="#09090b" />
+        <text
+          x={12}
+          y={currentY + 19}
+          fill="#71717a"
+          fontSize="12"
+          fontFamily="monospace"
+          fontWeight="bold"
+          letterSpacing="2"
+        >
+          // {dept.toUpperCase()}
+        </text>
+        <line x1={0} y1={currentY + DEPT_HEADER_HEIGHT} x2={totalWidth} y2={currentY + DEPT_HEADER_HEIGHT} stroke="#27272a" strokeWidth="1" />
+      </g>
+    );
+    currentY += DEPT_HEADER_HEIGHT;
 
-  const trackEndTimes: number[] = [];
-  const packedNodes: {
-    node: Node;
-    trackIndex: number;
-    plannedX: number;
-    plannedW: number;
-    actualX: number;
-    actualW: number;
-  }[] = [];
-  const BUFFER_MS = 12 * 60 * 60 * 1000; // 12hr buffer
+    deptNodes.forEach(node => {
+      const plannedX = getX(node.planned_start);
+      const plannedW = getW(node.planned_start, node.planned_end);
 
-  sortedNodes.forEach(node => {
-    const startMs = getStartMs(node);
-    const endMs = getEndMs(node);
+      const actualStart = node.actual_start || node.planned_start;
+      const actualEnd = node.actual_end || (node.status === 'In Progress' ? simulatedDate : actualStart);
+      const actualX = getX(actualStart);
+      const actualW = getW(actualStart, actualEnd);
 
-    let assignedTrack = -1;
-    for (let t = 0; t < trackEndTimes.length; t++) {
-      if (trackEndTimes[t] + BUFFER_MS <= startMs) {
-        assignedTrack = t;
-        break;
+      const bgColor = DEPT_COLORS[node.department as Department] || '#71717a';
+      const textColor = node.department === 'PM' || node.department === 'Design' ? '#000000' : '#ffffff';
+
+      let durationText = '';
+      if (node.actual_start) {
+        const numDays = getDaysDiff(node.actual_start, node.actual_end || simulatedDate) + 1;
+        durationText = node.actual_end ? `${numDays}d` : `${numDays}d (ip)`;
       }
-    }
 
-    if (assignedTrack === -1) {
-      assignedTrack = trackEndTimes.length;
-      trackEndTimes.push(endMs);
-    } else {
-      trackEndTimes[assignedTrack] = endMs;
-    }
+      svgElements.push(
+        <g key={`node-${node.id}`} style={{ cursor: 'pointer' }} onClick={() => setSelectedNode(node)}>
+          {/* Row Background & Separator Line */}
+          <rect x={0} y={currentY} width={totalWidth} height={ROW_HEIGHT} fill="none" />
+          <line x1={0} y1={currentY + ROW_HEIGHT} x2={totalWidth} y2={currentY + ROW_HEIGHT} stroke="#18181b" strokeWidth="1" />
 
-    const plannedX = getX(node.planned_start);
-    const plannedW = getW(node.planned_start, node.planned_end);
-    const actualStart = node.actual_start || node.planned_start;
-    const actualEnd = node.actual_end || (node.status === 'In Progress' ? simulatedDate : actualStart);
-    const actualX = getX(actualStart);
-    const actualW = getW(actualStart, actualEnd);
+          {/* Left Panel ID */}
+          <rect x={0} y={currentY} width={LEFT_PANEL_WIDTH} height={ROW_HEIGHT} fill="#000000" />
+          <text x={12} y={currentY + 42} fill="#71717a" fontSize="12" fontFamily="monospace" fontWeight="bold">{node.id}</text>
+          <line x1={LEFT_PANEL_WIDTH} y1={currentY} x2={LEFT_PANEL_WIDTH} y2={currentY + ROW_HEIGHT} stroke="#27272a" strokeWidth="1" />
 
-    packedNodes.push({
-      node,
-      trackIndex: assignedTrack,
-      plannedX,
-      plannedW,
-      actualX,
-      actualW
+          {/* Task Name Title (Above bars, anchored to planned start) */}
+          <text
+            x={plannedX}
+            y={currentY + 22}
+            fill="#e4e4e7"
+            fontSize="13"
+            fontFamily="monospace"
+            fontWeight="bold"
+          >
+            {node.title} {node.dependency && `[DEP: ${node.dependency}]`}
+          </text>
+
+          {/* Planned Bar */}
+          <rect
+            x={plannedX}
+            y={currentY + 30}
+            width={plannedW}
+            height={10}
+            fill="#27272a"
+            rx="4"
+          />
+
+          {/* Actual Bar & Duration Text Inside */}
+          {node.actual_start && (
+            <g>
+              <rect
+                x={actualX}
+                y={currentY + 44}
+                width={actualW}
+                height={20}
+                fill={bgColor}
+                rx="5"
+              />
+              <text
+                x={actualX + 8}
+                y={currentY + 58}
+                fill={textColor}
+                fontSize="11"
+                fontFamily="monospace"
+                fontWeight="bold"
+              >
+                {durationText}
+              </text>
+            </g>
+          )}
+        </g>
+      );
+      currentY += ROW_HEIGHT;
     });
   });
 
-  const totalTracks = Math.max(1, trackEndTimes.length);
-  const totalHeight = HEADER_HEIGHT + (totalTracks * ROW_HEIGHT);
+  const totalHeight = currentY;
 
   const handleExport = () => {
     if (!svgRef.current) return;
 
     let svgData = new XMLSerializer().serializeToString(svgRef.current);
-    svgData = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' + svgData;
+    svgData = '<?xml version="1.0" standalone="no"?>\n<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n' + svgData;
 
     const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'cardinal-gantt-presentation-large.svg';
+    link.download = 'cardinal-gantt-export.svg';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -147,40 +192,31 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
 
   const simulatedX = getX(simulatedDate) + (DAY_WIDTH / 2);
 
-  // Map for fast lookup during dependency line rendering
-  const nodeMap = new Map<string, typeof packedNodes[0]>();
-  packedNodes.forEach(item => nodeMap.set(item.node.id, item));
-
   return (
     <div className="flex flex-col h-full bg-black border border-zinc-800 rounded-lg overflow-hidden font-sans">
-      {/* Chart Header Bar */}
+      {/* Header Bar */}
       <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950 shrink-0">
         <div>
-          <h2 className="text-sm font-mono uppercase tracking-wider text-zinc-200 font-bold">
-            Project Execution Timeline ({nodes.length} Tasks packed into {totalTracks} Lane{totalTracks > 1 ? 's' : ''})
+          <h2 className="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold">
+            Active Gantt / Timeline ({nodes.length} Nodes)
           </h2>
-          <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block mt-0.5">
-            Ultra-Large Canva Presentation Export with Dependency Connectors
-          </span>
         </div>
-        <div className="flex items-center gap-5">
-          <div className="flex gap-4 text-xs font-mono text-zinc-300">
-            <div className="flex items-center gap-1.5"><div className="w-3.5 h-3.5 bg-[#38bdf8] rounded-sm"></div> PM</div>
-            <div className="flex items-center gap-1.5"><div className="w-3.5 h-3.5 bg-[#a855f7] rounded-sm"></div> Design</div>
-            <div className="flex items-center gap-1.5"><div className="w-3.5 h-3.5 bg-[#f43f5e] rounded-sm"></div> Eng</div>
-            <div className="flex items-center gap-1.5"><div className="w-3.5 h-3.5 bg-[#10b981] rounded-sm"></div> Everyone</div>
+        <div className="flex items-center gap-4">
+          <div className="flex gap-4 text-[10px] font-mono text-zinc-500">
+            <div className="flex items-center gap-2"><div className="w-4 h-1.5 bg-zinc-800 rounded-full"></div> Planned</div>
+            <div className="flex items-center gap-2"><div className="w-4 h-2 bg-zinc-300 rounded-full"></div> Actual</div>
           </div>
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 text-xs font-mono bg-zinc-100 text-black px-4 py-2 rounded hover:bg-white transition-colors font-bold tracking-wider cursor-pointer shadow-lg"
+            className="flex items-center gap-2 text-[10px] font-mono bg-zinc-900 text-zinc-300 px-3 py-1.5 rounded hover:bg-zinc-800 hover:text-white transition-colors border border-zinc-800 cursor-pointer"
           >
-            <Download className="w-4 h-4" />
-            EXPORT LARGE CANVA SVG
+            <Download className="w-3.5 h-3.5" />
+            EXPORT SVG
           </button>
         </div>
       </div>
 
-      {/* SVG Canvas Container */}
+      {/* SVG Timeline Canvas */}
       <div className="flex-1 overflow-auto bg-black">
         <svg
           ref={svgRef}
@@ -188,27 +224,9 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
           height={totalHeight}
           viewBox={`0 0 ${totalWidth} ${totalHeight}`}
           xmlns="http://www.w3.org/2000/svg"
-          shapeRendering="geometricPrecision"
-          textRendering="geometricPrecision"
           style={{ backgroundColor: '#000000' }}
         >
-          <defs>
-            <marker
-              id="arrowhead"
-              markerWidth="10"
-              markerHeight="7"
-              refX="9"
-              refY="3.5"
-              orient="auto"
-            >
-              <polygon points="0 0, 10 3.5, 0 7" fill="#ef4444" />
-            </marker>
-          </defs>
-
-          {/* Solid Black Canvas Background */}
-          <rect x={0} y={0} width={totalWidth} height={totalHeight} fill="#000000" />
-
-          {/* Vertical Day Grid Lines */}
+          {/* Grid Background Lines */}
           <g>
             {days.map((day, i) => (
               <line
@@ -218,54 +236,12 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
                 x2={LEFT_PANEL_WIDTH + i * DAY_WIDTH}
                 y2={totalHeight}
                 stroke="#18181b"
-                strokeWidth="1.5"
+                strokeWidth="1"
               />
             ))}
           </g>
 
-          {/* Lane Divider Lines */}
-          <g>
-            {Array.from({ length: totalTracks }).map((_, t) => (
-              <line
-                key={`lane-line-${t}`}
-                x1={0}
-                y1={HEADER_HEIGHT + (t + 1) * ROW_HEIGHT}
-                x2={totalWidth}
-                y2={HEADER_HEIGHT + (t + 1) * ROW_HEIGHT}
-                stroke="#27272a"
-                strokeWidth="1.5"
-              />
-            ))}
-          </g>
-
-          {/* Left Panel Track Headers */}
-          <g>
-            {Array.from({ length: totalTracks }).map((_, t) => (
-              <g key={`track-header-${t}`}>
-                <rect x={0} y={HEADER_HEIGHT + t * ROW_HEIGHT} width={LEFT_PANEL_WIDTH} height={ROW_HEIGHT} fill="#050507" />
-                <text
-                  x={16}
-                  y={HEADER_HEIGHT + t * ROW_HEIGHT + 52}
-                  fill="#f4f4f5"
-                  fontSize="15"
-                  fontFamily="Arial, Helvetica, sans-serif"
-                  fontWeight="bold"
-                >
-                  LANE {String(t + 1).padStart(2, '0')}
-                </text>
-                <line
-                  x1={LEFT_PANEL_WIDTH}
-                  y1={HEADER_HEIGHT + t * ROW_HEIGHT}
-                  x2={LEFT_PANEL_WIDTH}
-                  y2={HEADER_HEIGHT + (t + 1) * ROW_HEIGHT}
-                  stroke="#3f3f46"
-                  strokeWidth="2"
-                />
-              </g>
-            ))}
-          </g>
-
-          {/* Simulated "TODAY" Line */}
+          {/* Simulated TODAY Line */}
           <g>
             <line
               x1={simulatedX}
@@ -273,23 +249,23 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
               x2={simulatedX}
               y2={totalHeight}
               stroke="#ef4444"
-              strokeWidth="2.5"
-              strokeDasharray="6 4"
+              strokeWidth="2"
+              strokeDasharray="4 4"
             />
             <rect
-              x={simulatedX - 28}
-              y={HEADER_HEIGHT + 6}
-              width={56}
-              height={20}
+              x={simulatedX - 24}
+              y={HEADER_HEIGHT + 4}
+              width={48}
+              height={16}
               fill="#ef4444"
-              rx="4"
+              rx="2"
             />
             <text
               x={simulatedX}
-              y={HEADER_HEIGHT + 20}
+              y={HEADER_HEIGHT + 15}
               fill="#ffffff"
-              fontSize="11"
-              fontFamily="Arial, Helvetica, sans-serif"
+              fontSize="9"
+              fontFamily="monospace"
               fontWeight="bold"
               textAnchor="middle"
             >
@@ -297,25 +273,10 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             </text>
           </g>
 
-          {/* Date Axis Header Bar */}
+          {/* Top Date Header */}
           <g>
-            <rect x={0} y={0} width={totalWidth} height={HEADER_HEIGHT} fill="#0a0a0c" />
-            <line x1={0} y1={HEADER_HEIGHT} x2={totalWidth} y2={HEADER_HEIGHT} stroke="#3f3f46" strokeWidth="2" />
-
-            <text
-              x={16}
-              y={34}
-              fill="#a1a1aa"
-              fontSize="14"
-              fontFamily="Arial, Helvetica, sans-serif"
-              fontWeight="bold"
-            >
-              LANES
-            </text>
-
-            <line x1={LEFT_PANEL_WIDTH} y1={0} x2={LEFT_PANEL_WIDTH} y2={totalHeight} stroke="#3f3f46" strokeWidth="2" />
-
-            {/* Date Columns */}
+            <rect x={0} y={0} width={totalWidth} height={HEADER_HEIGHT} fill="#000000" />
+            <line x1={0} y1={HEADER_HEIGHT} x2={totalWidth} y2={HEADER_HEIGHT} stroke="#27272a" strokeWidth="1" />
             {days.map((day, i) => {
               const dateObj = new Date(day);
               const formattedDate = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
@@ -323,10 +284,10 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
                 <text
                   key={`header-${day}`}
                   x={LEFT_PANEL_WIDTH + i * DAY_WIDTH + (DAY_WIDTH / 2)}
-                  y={34}
-                  fill="#d4d4d8"
-                  fontSize="14"
-                  fontFamily="Arial, Helvetica, sans-serif"
+                  y={28}
+                  fill="#71717a"
+                  fontSize="12"
+                  fontFamily="monospace"
                   fontWeight="bold"
                   textAnchor="middle"
                 >
@@ -336,137 +297,12 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             })}
           </g>
 
-          {/* Dependency Connector Arrows */}
-          <g>
-            {packedNodes.map(targetItem => {
-              if (!targetItem.node.dependency) return null;
-              const sourceItem = nodeMap.get(targetItem.node.dependency);
-              if (!sourceItem) return null;
-
-              // Source end coordinates (center of bar)
-              const srcX = sourceItem.node.actual_start
-                ? (sourceItem.actualX + sourceItem.actualW)
-                : (sourceItem.plannedX + sourceItem.plannedW);
-              const srcY = HEADER_HEIGHT + sourceItem.trackIndex * ROW_HEIGHT + 66;
-
-              // Target start coordinates
-              const trgX = targetItem.node.actual_start
-                ? targetItem.actualX
-                : targetItem.plannedX;
-              const trgY = HEADER_HEIGHT + targetItem.trackIndex * ROW_HEIGHT + 66;
-
-              // Bezier Curve
-              const controlDist = Math.max(30, Math.abs(trgX - srcX) / 2);
-              const pathD = `M ${srcX} ${srcY} C ${srcX + controlDist} ${srcY}, ${trgX - controlDist} ${trgY}, ${trgX} ${trgY}`;
-
-              return (
-                <g key={`dep-${sourceItem.node.id}-${targetItem.node.id}`}>
-                  <path
-                    d={pathD}
-                    stroke="#ef4444"
-                    strokeWidth="2.5"
-                    fill="none"
-                    strokeDasharray="5 3"
-                    markerEnd="url(#arrowhead)"
-                  />
-                </g>
-              );
-            })}
-          </g>
-
-          {/* Packed Task Nodes */}
-          <g>
-            {packedNodes.map(({ node, trackIndex, plannedX, plannedW, actualX, actualW }) => {
-              const bgColor = DEPT_COLORS[node.department as Department] || '#71717a';
-              const rowY = HEADER_HEIGHT + trackIndex * ROW_HEIGHT;
-
-              let durationText = '';
-              if (node.actual_start) {
-                const numDays = getDaysDiff(node.actual_start, node.actual_end || simulatedDate) + 1;
-                durationText = node.actual_end ? `${numDays}d` : `${numDays}d (ip)`;
-              }
-
-              // Text position logic: if bar is narrow or near edge, place outside
-              const labelText = `[${node.id}] [${node.department.toUpperCase()}] ${node.title}`;
-              const labelX = plannedX;
-
-              return (
-                <g
-                  key={`node-${node.id}`}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => setSelectedNode(node)}
-                >
-                  {/* Task Header Text (Large 14px Bold) */}
-                  <text
-                    x={labelX}
-                    y={rowY + 28}
-                    fill="#ffffff"
-                    fontSize="14"
-                    fontFamily="Arial, Helvetica, sans-serif"
-                    fontWeight="bold"
-                  >
-                    {labelText}
-                  </text>
-
-                  {/* Planned Container Bar */}
-                  <rect
-                    x={plannedX}
-                    y={rowY + 36}
-                    width={plannedW}
-                    height={14}
-                    fill="#27272a"
-                    stroke="#3f3f46"
-                    strokeWidth="1"
-                    rx="4"
-                  />
-
-                  {/* Actual Progress Bar */}
-                  {node.actual_start && (
-                    <g>
-                      <rect
-                        x={actualX}
-                        y={rowY + 54}
-                        width={actualW}
-                        height={24}
-                        fill={bgColor}
-                        rx="5"
-                      />
-
-                      {/* Duration Text inside or beside actual bar */}
-                      {actualW > 45 ? (
-                        <text
-                          x={actualX + actualW / 2}
-                          y={rowY + 70}
-                          fill="#000000"
-                          fontSize="12"
-                          fontFamily="Arial, Helvetica, sans-serif"
-                          fontWeight="bold"
-                          textAnchor="middle"
-                        >
-                          {durationText}
-                        </text>
-                      ) : (
-                        <text
-                          x={actualX + actualW + 10}
-                          y={rowY + 70}
-                          fill="#d4d4d8"
-                          fontSize="12"
-                          fontFamily="Arial, Helvetica, sans-serif"
-                          fontWeight="bold"
-                        >
-                          {durationText}
-                        </text>
-                      )}
-                    </g>
-                  )}
-                </g>
-              );
-            })}
-          </g>
+          {/* Department Groups & Rows */}
+          {svgElements}
         </svg>
       </div>
 
-      {/* Task Details Modal */}
+      {/* Detail Modal */}
       {selectedNode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto font-mono">
           <div className="bg-zinc-950 border border-zinc-900 rounded-lg w-full max-w-md overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.8)] text-xs text-zinc-300 animate-fadeIn">
