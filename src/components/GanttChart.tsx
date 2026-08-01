@@ -22,7 +22,6 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
   const ROW_HEIGHT = 64;
   const HEADER_HEIGHT = 40;
   const LEFT_PANEL_WIDTH = 80;
-  const DEPT_HEADER_HEIGHT = 24;
 
   // Date Math Helpers
   const parseDate = (d: string) => new Date(d).getTime();
@@ -60,99 +59,67 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
 
   const totalWidth = LEFT_PANEL_WIDTH + (totalDays * DAY_WIDTH);
 
-  let currentY = HEADER_HEIGHT;
-  const svgElements: React.JSX.Element[] = [];
+  // --- COMPACT TRACK PACKING ALGORITHM ---
+  const getStartMs = (node: Node) => {
+    const p = parseDate(node.planned_start);
+    const a = node.actual_start ? parseDate(node.actual_start) : Infinity;
+    return Math.min(p, a);
+  };
 
-  nodes.forEach(node => {
-    const plannedX = getX(node.planned_start);
-    const plannedW = getW(node.planned_start, node.planned_end);
+  const getEndMs = (node: Node) => {
+    const p = parseDate(node.planned_end);
+    const a = node.actual_end ? parseDate(node.actual_end) : (node.status === 'In Progress' ? simulatedTime : p);
+    return Math.max(p, a);
+  };
 
-    const actualStart = node.actual_start || node.planned_start;
-    const actualEnd = node.actual_end || (node.status === 'In Progress' ? simulatedDate : actualStart);
-    const actualX = getX(actualStart);
-    const actualW = getW(actualStart, actualEnd);
-
-    const bgColor = DEPT_COLORS[node.department as Department] || '#71717a';
-    const textColor = node.department === 'PM' || node.department === 'Design' ? '#000000' : '#ffffff';
-
-    let durationText = '';
-    if (node.actual_start) {
-      const days = getDaysDiff(node.actual_start, node.actual_end || simulatedDate) + 1;
-      durationText = node.actual_end ? `${days}d` : `${days}d (ip)`;
-    }
-
-    svgElements.push(
-      <g key={`node-${node.id}`} style={{ cursor: 'pointer' }} onClick={() => setSelectedNode(node)}>
-        {/* Row Background */}
-        <rect x={0} y={currentY} width={totalWidth} height={ROW_HEIGHT} fill="none" />
-        <line x1={0} y1={currentY + ROW_HEIGHT} x2={totalWidth} y2={currentY + ROW_HEIGHT} stroke="#18181b" strokeWidth="1" />
-
-        {/* Left Panel ID */}
-        <rect x={0} y={currentY} width={LEFT_PANEL_WIDTH} height={ROW_HEIGHT} fill="#000000" />
-        <text x={10} y={currentY + 36} fill="#71717a" fontSize="10" fontFamily="monospace">{node.id}</text>
-        <line x1={LEFT_PANEL_WIDTH} y1={currentY} x2={LEFT_PANEL_WIDTH} y2={currentY + ROW_HEIGHT} stroke="#27272a" strokeWidth="1" />
-
-        {/* Task Name (Always above bars, anchored to planned start) */}
-        <text
-          x={plannedX}
-          y={currentY + 18}
-          fill="#e4e4e7"
-          fontSize="10"
-          fontFamily="monospace"
-          fontWeight="bold"
-        >
-          [{node.department.toUpperCase()}] {node.title} {node.dependency && `[DEP: ${node.dependency}]`}
-        </text>
-
-        {/* Planned Bar */}
-        <rect
-          x={plannedX}
-          y={currentY + 26}
-          width={plannedW}
-          height={8}
-          fill="#27272a"
-          rx="4"
-        />
-
-        {/* Actual Bar */}
-        {node.actual_start && (
-          <g>
-            <rect
-              x={actualX}
-              y={currentY + 38}
-              width={actualW}
-              height={18}
-              fill={bgColor}
-              rx="5"
-            />
-            <text
-              x={actualX + 6}
-              y={currentY + 50}
-              fill={textColor}
-              fontSize="9"
-              fontFamily="monospace"
-              fontWeight="bold"
-            >
-              {durationText}
-            </text>
-          </g>
-        )}
-      </g>
-    );
-    currentY += ROW_HEIGHT;
+  const sortedNodes = [...nodes].sort((a, b) => {
+    const startDiff = getStartMs(a) - getStartMs(b);
+    if (startDiff !== 0) return startDiff;
+    return getEndMs(a) - getEndMs(b);
   });
 
-  const totalHeight = currentY;
+  const trackEndTimes: number[] = [];
+  const packedNodes: { node: Node; trackIndex: number }[] = [];
+  const BUFFER_MS = 12 * 60 * 60 * 1000; // 12hr buffer between tasks in same lane
+
+  sortedNodes.forEach(node => {
+    const startMs = getStartMs(node);
+    const endMs = getEndMs(node);
+
+    let assignedTrack = -1;
+    for (let t = 0; t < trackEndTimes.length; t++) {
+      if (trackEndTimes[t] + BUFFER_MS <= startMs) {
+        assignedTrack = t;
+        break;
+      }
+    }
+
+    if (assignedTrack === -1) {
+      assignedTrack = trackEndTimes.length;
+      trackEndTimes.push(endMs);
+    } else {
+      trackEndTimes[assignedTrack] = endMs;
+    }
+
+    packedNodes.push({ node, trackIndex: assignedTrack });
+  });
+
+  const totalTracks = Math.max(1, trackEndTimes.length);
+  const totalHeight = HEADER_HEIGHT + (totalTracks * ROW_HEIGHT);
 
   const handleExport = () => {
     if (!svgRef.current) return;
-    
-    // Create a clone to strip React-specific attributes if needed, or just serialize
+
     let svgData = new XMLSerializer().serializeToString(svgRef.current);
     
-    // Add XML declaration which Canva prefers
+    // Inject embedded styles for Canva vector crispness if not present
+    if (!svgData.includes('JetBrains Mono')) {
+      const defsBlock = `<defs><style type="text/css">@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&amp;display=swap'); text { font-family: 'JetBrains Mono', 'Courier New', Courier, monospace; text-rendering: geometricPrecision; }</style></defs>`;
+      svgData = svgData.replace(/<svg([^>]*)>/, `<svg$1>${defsBlock}`);
+    }
+
     svgData = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' + svgData;
-    
+
     const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -163,12 +130,14 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
     document.body.removeChild(link);
   };
 
-  const simulatedX = getX(simulatedDate) + (DAY_WIDTH / 2); // Center of the day
+  const simulatedX = getX(simulatedDate) + (DAY_WIDTH / 2);
 
   return (
     <div className="flex flex-col h-full bg-black border border-zinc-800 rounded-lg overflow-hidden">
       <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950 shrink-0">
-        <h2 className="text-xs font-mono uppercase tracking-wider text-zinc-400">Active Gantt / Timeline</h2>
+        <h2 className="text-xs font-mono uppercase tracking-wider text-zinc-400">
+          Active Gantt / Integrated Timeline ({totalTracks} Lane{totalTracks > 1 ? 's' : ''})
+        </h2>
         <div className="flex items-center gap-4">
           <div className="flex gap-4 text-[10px] font-mono text-zinc-500">
             <div className="flex items-center gap-2"><div className="w-4 h-1.5 bg-zinc-800 rounded-full"></div> Planned</div>
@@ -191,9 +160,21 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
           height={totalHeight}
           viewBox={`0 0 ${totalWidth} ${totalHeight}`}
           xmlns="http://www.w3.org/2000/svg"
+          xmlnsXlink="http://www.w3.org/1999/xlink"
+          shapeRendering="geometricPrecision"
+          textRendering="geometricPrecision"
           style={{ backgroundColor: '#000000' }}
         >
-          {/* Grid Background */}
+          <defs>
+            <style type="text/css">
+              {`@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap'); text { font-family: 'JetBrains Mono', 'Courier New', Courier, monospace; text-rendering: geometricPrecision; }`}
+            </style>
+          </defs>
+
+          {/* Crisp Black Background */}
+          <rect x={0} y={0} width={totalWidth} height={totalHeight} fill="#000000" />
+
+          {/* Grid Background Lines */}
           <g>
             {days.map((day, i) => (
               <line
@@ -205,6 +186,44 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
                 stroke="#18181b"
                 strokeWidth="1"
               />
+            ))}
+            {Array.from({ length: totalTracks }).map((_, t) => (
+              <line
+                key={`row-line-${t}`}
+                x1={0}
+                y1={HEADER_HEIGHT + (t + 1) * ROW_HEIGHT}
+                x2={totalWidth}
+                y2={HEADER_HEIGHT + (t + 1) * ROW_HEIGHT}
+                stroke="#18181b"
+                strokeWidth="1"
+              />
+            ))}
+          </g>
+
+          {/* Left Panel Track Headers */}
+          <g>
+            {Array.from({ length: totalTracks }).map((_, t) => (
+              <g key={`track-header-${t}`}>
+                <rect x={0} y={HEADER_HEIGHT + t * ROW_HEIGHT} width={LEFT_PANEL_WIDTH} height={ROW_HEIGHT} fill="#000000" />
+                <text
+                  x={10}
+                  y={HEADER_HEIGHT + t * ROW_HEIGHT + 36}
+                  fill="#71717a"
+                  fontSize="10"
+                  fontFamily="'JetBrains Mono', 'Courier New', monospace"
+                  fontWeight="bold"
+                >
+                  LANE {String(t + 1).padStart(2, '0')}
+                </text>
+                <line
+                  x1={LEFT_PANEL_WIDTH}
+                  y1={HEADER_HEIGHT + t * ROW_HEIGHT}
+                  x2={LEFT_PANEL_WIDTH}
+                  y2={HEADER_HEIGHT + (t + 1) * ROW_HEIGHT}
+                  stroke="#27272a"
+                  strokeWidth="1"
+                />
+              </g>
             ))}
           </g>
 
@@ -232,7 +251,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
               y={HEADER_HEIGHT + 10}
               fill="#ffffff"
               fontSize="8"
-              fontFamily="monospace"
+              fontFamily="'JetBrains Mono', 'Courier New', monospace"
               fontWeight="bold"
               textAnchor="middle"
             >
@@ -240,7 +259,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             </text>
           </g>
 
-          {/* Header */}
+          {/* Date Axis Header */}
           <g>
             <rect x={0} y={0} width={totalWidth} height={HEADER_HEIGHT} fill="#000000" />
             <line x1={0} y1={HEADER_HEIGHT} x2={totalWidth} y2={HEADER_HEIGHT} stroke="#27272a" strokeWidth="1" />
@@ -254,7 +273,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
                   y={24}
                   fill="#52525b"
                   fontSize="10"
-                  fontFamily="monospace"
+                  fontFamily="'JetBrains Mono', 'Courier New', monospace"
                   textAnchor="middle"
                 >
                   {formattedDate}
@@ -263,8 +282,79 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             })}
           </g>
 
-          {/* Rows */}
-          {svgElements}
+          {/* Tasks Packed into Compact Tracks */}
+          <g>
+            {packedNodes.map(({ node, trackIndex }) => {
+              const plannedX = getX(node.planned_start);
+              const plannedW = getW(node.planned_start, node.planned_end);
+
+              const actualStart = node.actual_start || node.planned_start;
+              const actualEnd = node.actual_end || (node.status === 'In Progress' ? simulatedDate : actualStart);
+              const actualX = getX(actualStart);
+              const actualW = getW(actualStart, actualEnd);
+
+              const bgColor = DEPT_COLORS[node.department as Department] || '#71717a';
+              const textColor = node.department === 'PM' || node.department === 'Design' ? '#000000' : '#ffffff';
+
+              const currentY = HEADER_HEIGHT + trackIndex * ROW_HEIGHT;
+
+              let durationText = '';
+              if (node.actual_start) {
+                const days = getDaysDiff(node.actual_start, node.actual_end || simulatedDate) + 1;
+                durationText = node.actual_end ? `${days}d` : `${days}d (ip)`;
+              }
+
+              return (
+                <g key={`node-${node.id}`} style={{ cursor: 'pointer' }} onClick={() => setSelectedNode(node)}>
+                  {/* Task ID, Department Tag & Title */}
+                  <text
+                    x={plannedX}
+                    y={currentY + 18}
+                    fill="#e4e4e7"
+                    fontSize="10"
+                    fontFamily="'JetBrains Mono', 'Courier New', monospace"
+                    fontWeight="bold"
+                  >
+                    [{node.id}] [{node.department.toUpperCase()}] {node.title} {node.dependency && `[DEP: ${node.dependency}]`}
+                  </text>
+
+                  {/* Planned Schedule Bar */}
+                  <rect
+                    x={plannedX}
+                    y={currentY + 26}
+                    width={plannedW}
+                    height={8}
+                    fill="#27272a"
+                    rx="4"
+                  />
+
+                  {/* Actual Progress Bar */}
+                  {node.actual_start && (
+                    <g>
+                      <rect
+                        x={actualX}
+                        y={currentY + 38}
+                        width={actualW}
+                        height={18}
+                        fill={bgColor}
+                        rx="5"
+                      />
+                      <text
+                        x={actualX + 6}
+                        y={currentY + 50}
+                        fill={textColor}
+                        fontSize="9"
+                        fontFamily="'JetBrains Mono', 'Courier New', monospace"
+                        fontWeight="bold"
+                      >
+                        {durationText}
+                      </text>
+                    </g>
+                  )}
+                </g>
+              );
+            })}
+          </g>
         </svg>
       </div>
 
