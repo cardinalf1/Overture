@@ -94,7 +94,7 @@ const defaultNews: NewsUpdate[] = [
 
 export default function App() {
   const { isSupabaseActive, role: authRole, user, name: authName, signOut } = useAuth();
-  const isAdmin = authRole === 'Admin';
+  const isAdmin = authRole === 'Admin' || authRole === 'Team';
   const [currentRole, setCurrentRole] = useState<Role>('PM');
 
   const userRef = useRef(user);

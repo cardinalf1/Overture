@@ -28,9 +28,18 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
 
 function STLModel({ url }: { url: string }) {
   const geom = useLoader(STLLoader, url);
+
+  React.useMemo(() => {
+    if (geom) {
+      geom.center();
+      geom.computeVertexNormals();
+    }
+  }, [geom]);
+
+  // Rotation [-Math.PI / 2, 0, 0] lays CAD Z-up models flat HORIZONTALLY along the X-Z ground plane
   return (
-    <mesh geometry={geom}>
-      <meshStandardMaterial color="#71717a" roughness={0.5} metalness={0.8} />
+    <mesh geometry={geom} rotation={[-Math.PI / 2, 0, 0]}>
+      <meshStandardMaterial color="#d4d4d8" roughness={0.4} metalness={0.8} />
     </mesh>
   );
 }
@@ -39,16 +48,16 @@ export function ModelViewer({ url }: { url: string }) {
   return (
     <ErrorBoundary>
       <div className="w-full h-full bg-zinc-950 rounded-lg overflow-hidden border border-zinc-900 relative">
-        <Canvas shadows camera={{ position: [0, 0, 100], fov: 50 }}>
+        <Canvas shadows camera={{ position: [0, 40, 100], fov: 45 }}>
           <Suspense fallback={null}>
-            <Stage environment="city" intensity={0.5}>
+            <Stage environment="city" intensity={0.6}>
               <STLModel url={url} />
             </Stage>
           </Suspense>
           <OrbitControls makeDefault autoRotate autoRotateSpeed={2} />
         </Canvas>
         <div className="absolute bottom-4 right-4 text-[10px] font-mono text-zinc-500 uppercase tracking-widest pointer-events-none">
-          LBM / Virtual Wind Tunnel Active
+          LBM / Virtual Wind Tunnel Active (Horizontal Mode)
         </div>
       </div>
     </ErrorBoundary>

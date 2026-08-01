@@ -5,6 +5,7 @@ import {
   Lock, Copy, Check, Info, HelpCircle, Key, RefreshCw, Eye, EyeOff, Send, Edit2
 } from 'lucide-react';
 import { AuthorizedUser } from '../types';
+import { useAuth } from './AuthGate';
 
 interface AccessControlPanelProps {
   authorizedUsers: AuthorizedUser[];
@@ -32,6 +33,10 @@ export function AccessControlPanel({
   accountRequests,
   onDeleteAccountRequest
 }: AccessControlPanelProps) {
+  const { role: currentUserRole } = useAuth();
+  const isCurrentUserAdmin = currentUserRole === 'Admin';
+  const canSeePasswords = currentUserRole === 'Admin' || currentUserRole === 'Judge';
+
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'Admin' | 'Team' | 'Sponsor' | 'Judge'>('Sponsor');
   const [department, setDepartment] = useState<'Design' | 'Engineering' | 'PM'>('Design');
@@ -53,6 +58,10 @@ export function AccessControlPanel({
   const [editNotes, setEditNotes] = useState('');
 
   const startEdit = (user: AuthorizedUser) => {
+    if (user.role === 'Admin' && !isCurrentUserAdmin) {
+      alert('Only Administrators can modify Admin user accounts.');
+      return;
+    }
     setEditingUserId(user.id);
     setEditRole(user.role);
     setEditPassword(user.password || '');
@@ -65,6 +74,10 @@ export function AccessControlPanel({
   };
 
   const saveEdit = (user: AuthorizedUser) => {
+    if (editRole === 'Admin' && !isCurrentUserAdmin) {
+      alert('Only Administrators can promote accounts to the Admin role.');
+      return;
+    }
     onUpdateAuthorizedUser({
       ...user,
       role: editRole,
@@ -82,6 +95,11 @@ export function AccessControlPanel({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) return;
+
+    if (role === 'Admin' && !isCurrentUserAdmin) {
+      alert('Only Administrators can create new Admin accounts.');
+      return;
+    }
 
     // Check if email already authorized
     if (authorizedUsers.some(u => u.email.toLowerCase().trim() === email.toLowerCase().trim())) {
@@ -109,6 +127,7 @@ export function AccessControlPanel({
   const emailLower = (str: string) => str.toLowerCase().trim();
 
   const copyLoginKit = (user: AuthorizedUser) => {
+    const displayedPass = canSeePasswords ? (user.password || '(Contact Team)') : '•••••••• (Protected)';
     const kitText = `=========================================
 CARDINAL OVERTURE F1 SECURE PORTAL
 =========================================
@@ -116,7 +135,7 @@ Your secure credentials have been provisioned:
 
 - Workspace URL: ${window.location.origin}
 - Username/Email: ${user.email}
-- Password: ${user.password || '(Contact Team)'}
+- Password: ${displayedPass}
 - Access Profile: ${user.role}
 
 All car designs, aerodynamic simulation matrices, and financial
@@ -136,7 +155,7 @@ We have provisioned your access credentials:
 
 - Workspace URL: ${window.location.origin}
 - Username/Email: ${email || '[User Email]'}
-- Temporary Password: ${password}
+- Temporary Password: ${canSeePasswords ? password : '••••••••'}
 - Access Profile: ${role}
 
 Please use these credentials to sign in directly.
@@ -148,6 +167,10 @@ Please use these credentials to sign in directly.
   };
 
   const togglePasswordVisibility = (id: string) => {
+    if (!canSeePasswords) {
+      alert('Password visibility is restricted to Administrators and Judges.');
+      return;
+    }
     setVisiblePasswords(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
@@ -158,195 +181,198 @@ Please use these credentials to sign in directly.
           <span className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase block">SECURE CREDENTIALS RAIL</span>
           <h1 className="text-xl font-mono font-bold text-zinc-100 tracking-tight uppercase flex items-center gap-2">
             <Lock className="w-5 h-5 text-zinc-400" />
-            Access Authorization Engine
+            ACCESS CONTROL &amp; IDENTITY MANAGEMENT
           </h1>
+        </div>
+        <div className="flex items-center gap-2 text-xs font-mono bg-zinc-950 border border-zinc-900 px-3 py-1.5 rounded-md text-zinc-400">
+          <ShieldAlert className="w-4 h-4 text-emerald-500" />
+          <span>RLS HARDENED POLICY ACTIVE</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Register/Authorize form */}
-        <div className="space-y-6">
-          <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6 space-y-4">
-            <div className="flex items-center gap-2 text-zinc-100 font-bold uppercase text-xs">
+      {successMsg && (
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-emerald-950/30 border border-emerald-900/50 text-emerald-400 p-3 rounded text-xs font-mono flex items-center gap-2"
+        >
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          {successMsg}
+        </motion.div>
+      )}
+
+      {/* Grid containing provision box & user table */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        {/* Left Column: Create User */}
+        <div className="lg:col-span-5 bg-zinc-950 border border-zinc-900 rounded-lg p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-4 border-b border-zinc-900 pb-3">
               <UserPlus className="w-4 h-4 text-zinc-400" />
-              <span>Provision User Credentials</span>
+              <h2 className="text-xs font-mono font-bold text-zinc-200 uppercase tracking-wider">
+                PRE-AUTHORIZE USER ACCOUNT
+              </h2>
             </div>
             
-            <p className="text-[10px] font-mono text-zinc-500 uppercase leading-relaxed">
-              Define the exact login credentials (Email & Password) for your partners, sponsors, or judges. Only they will be allowed to log in; public registration is disabled.
+            <p className="text-[11px] font-mono text-zinc-400 leading-relaxed mb-4">
+              Define the exact login credentials (Email &amp; Password) for your partners, sponsors, or judges. Only they will be allowed to log in; public registration is disabled.
             </p>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4 font-mono text-xs">
               {/* Email */}
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-mono tracking-wider text-zinc-500 uppercase block">EMAIL IDENTIFIER</label>
+              <div>
+                <label className="text-[9px] font-mono tracking-wider text-zinc-500 uppercase block mb-1">TARGET EMAIL ADDRESS</label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-2.5 w-4 h-4 text-zinc-600" />
+                  <Mail className="w-4 h-4 absolute left-3 top-2.5 text-zinc-600" />
                   <input
                     type="email"
                     required
+                    placeholder="partner@sponsor-company.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="partner@sponsorcorp.com"
-                    className="w-full bg-black border border-zinc-900 rounded pl-9 pr-3 py-2 text-xs font-mono text-zinc-200 placeholder-zinc-850 focus:outline-none focus:border-zinc-800 transition-colors"
+                    className="w-full bg-black border border-zinc-900 rounded pl-9 pr-3 py-2 text-zinc-200 focus:outline-none focus:border-zinc-700 transition-colors"
                   />
                 </div>
               </div>
 
               {/* Password */}
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
+              <div>
+                <div className="flex justify-between items-center mb-1">
                   <label className="text-[9px] font-mono tracking-wider text-zinc-500 uppercase block">DESIGNATED PASSWORD</label>
                   <button
                     type="button"
                     onClick={handleRegeneratePassword}
-                    className="text-[9px] font-mono text-zinc-400 hover:text-white flex items-center gap-1 uppercase tracking-wider"
+                    className="text-[9px] text-zinc-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
                     title="Generate Random Password"
                   >
-                    <RefreshCw className="w-3 h-3" /> Auto
+                    <RefreshCw className="w-2.5 h-2.5" /> RE-GENERATE
                   </button>
                 </div>
                 <div className="relative">
-                  <Key className="absolute left-3 top-2.5 w-4 h-4 text-zinc-600" />
                   <input
-                    type={showPassword ? "text" : "password"}
+                    type={showPassword && canSeePasswords ? "text" : "password"}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-black border border-zinc-900 rounded pl-9 pr-10 py-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-800 transition-colors"
+                    className="w-full bg-black border border-zinc-900 rounded pl-3 pr-9 py-2 text-zinc-200 font-mono focus:outline-none focus:border-zinc-700 transition-colors"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-2.5 text-zinc-600 hover:text-zinc-400"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+                  {canSeePasswords && (
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-2.5 text-zinc-500 hover:text-zinc-300"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* Role Select */}
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-mono tracking-wider text-zinc-500 uppercase block">ACCESS PROFILE</label>
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as any)}
-                  className="w-full bg-black border border-zinc-900 rounded px-3 py-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-800 transition-colors"
-                >
-                  <option value="Admin">System Administrator (Admin)</option>
-                  <option value="Team">Team Member</option>
-                  <option value="Sponsor">Sponsor / Partner</option>
-                  <option value="Judge">Judge / Evaluator</option>
-                </select>
-              </div>
-
-              {/* Department Select (For Team role only) */}
-              {role === 'Team' && (
-                <div className="space-y-1.5 animate-fadeIn">
-                  <label className="text-[9px] font-mono tracking-wider text-zinc-500 uppercase block">ASSIGNED DEPARTMENT</label>
+              {/* Role Selection */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[9px] font-mono tracking-wider text-zinc-500 uppercase block mb-1">ACCESS ROLE</label>
                   <select
-                    value={department}
-                    onChange={(e) => setDepartment(e.target.value as any)}
-                    className="w-full bg-black border border-zinc-900 rounded px-3 py-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-800 transition-colors"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value as any)}
+                    className="w-full bg-black border border-zinc-900 rounded px-3 py-2 text-zinc-200 focus:outline-none focus:border-zinc-700 transition-colors"
                   >
-                    <option value="Design">Design</option>
-                    <option value="Engineering">Engineering</option>
+                    {isCurrentUserAdmin && <option value="Admin">Admin</option>}
+                    <option value="Team">Team Member</option>
+                    <option value="Sponsor">Sponsor</option>
+                    <option value="Judge">Judge</option>
                   </select>
                 </div>
-              )}
+
+                {role === 'Team' && (
+                  <div>
+                    <label className="text-[9px] font-mono tracking-wider text-zinc-500 uppercase block mb-1">DEPARTMENT</label>
+                    <select
+                      value={department}
+                      onChange={(e) => setDepartment(e.target.value as any)}
+                      className="w-full bg-black border border-zinc-900 rounded px-3 py-2 text-zinc-200 focus:outline-none focus:border-zinc-700 transition-colors"
+                    >
+                      <option value="Design">Design</option>
+                      <option value="Engineering">Engineering</option>
+                      <option value="PM">Project Mgmt</option>
+                    </select>
+                  </div>
+                )}
+              </div>
 
               {/* Notes */}
-              <div className="space-y-1.5">
-                <label className="text-[9px] font-mono tracking-wider text-zinc-500 uppercase block">ADMIN NOTES / ORGANIZATION</label>
+              <div>
+                <label className="text-[9px] font-mono tracking-wider text-zinc-500 uppercase block mb-1">MEMORANDUM / REMARKS</label>
                 <input
                   type="text"
+                  placeholder="e.g. Lead Engineer or Title Sponsor"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="e.g. Platinum Sponsor, Intel Corp"
-                  className="w-full bg-black border border-zinc-900 rounded px-3 py-2 text-xs font-mono text-zinc-200 placeholder-zinc-850 focus:outline-none focus:border-zinc-800 transition-colors"
+                  className="w-full bg-black border border-zinc-900 rounded px-3 py-2 text-zinc-200 focus:outline-none focus:border-zinc-700 transition-colors"
                 />
               </div>
 
-              {/* Greenlight toggle on creation */}
-              <div className="flex items-center gap-2 py-1 select-none">
+              {/* Greenlight Checkbox */}
+              <div className="flex items-center gap-2 pt-1">
                 <input
                   type="checkbox"
-                  id="greenlight-checkbox"
+                  id="greenlight"
                   checked={greenlightImmediately}
                   onChange={(e) => setGreenlightImmediately(e.target.checked)}
-                  className="rounded border-zinc-900 bg-black text-emerald-500 focus:ring-0 focus:ring-offset-0 cursor-pointer w-4 h-4"
+                  className="rounded border-zinc-800 bg-black text-emerald-500 focus:ring-0 accent-emerald-500"
                 />
-                <label htmlFor="greenlight-checkbox" className="text-[10px] font-mono tracking-wider text-zinc-500 uppercase cursor-pointer">
+                <label htmlFor="greenlight" className="text-[10px] text-zinc-400 font-mono uppercase cursor-pointer select-none">
                   GREENLIGHT ACCOUNT IMMEDIATELY
                 </label>
               </div>
 
-              <button
-                type="submit"
-                className="w-full text-xs font-mono bg-zinc-100 hover:bg-white text-black py-2.5 rounded font-bold uppercase transition-colors flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <UserCheck className="w-3.5 h-3.5" />
-                CREATE ACCOUNT CREDENTIALS
-              </button>
-            </form>
-
-            <AnimatePresence>
-              {successMsg && (
-                <motion.div
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -5 }}
-                  className="bg-emerald-950/20 border border-emerald-900/40 rounded p-3 text-[10px] font-mono text-emerald-400 uppercase text-center"
+              <div className="pt-2 flex items-center gap-2">
+                <button
+                  type="submit"
+                  className="flex-1 bg-zinc-100 text-black hover:bg-white transition-colors font-mono font-bold text-xs py-2.5 rounded tracking-wider uppercase flex items-center justify-center gap-2 cursor-pointer shadow-lg"
                 >
-                  {successMsg}
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  <UserCheck className="w-4 h-4" />
+                  PRE-AUTHORIZE CREDENTIALS
+                </button>
+              </div>
+            </form>
           </div>
 
-          {/* Quick Guide */}
-          <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6 space-y-4">
-            <div className="flex items-center gap-2 text-zinc-200 font-bold uppercase text-xs">
-              <HelpCircle className="w-4 h-4 text-zinc-400" />
-              <span>CREDENTIAL DELIVERY</span>
-            </div>
-            
-            <p className="text-[10px] font-mono text-zinc-500 uppercase leading-relaxed">
-              Copy the complete login welcome letter containing the designated password below to send directly to your partner via email or message:
-            </p>
-
+          {/* Login Kit Helper Button */}
+          <div className="mt-4 pt-4 border-t border-zinc-900">
             <button
               onClick={copyCustomInvite}
-              className="w-full text-[10px] font-mono bg-zinc-900 hover:bg-zinc-850 text-zinc-300 py-2 border border-zinc-800 hover:border-zinc-700 rounded transition-colors flex items-center justify-center gap-2 uppercase cursor-pointer"
+              className="w-full bg-zinc-900 hover:bg-zinc-850 text-zinc-300 hover:text-white border border-zinc-800 text-[10px] font-mono py-2 rounded uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
-              {copiedKit ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Send className="w-3.5 h-3.5" />}
-              {copiedKit ? 'COPIED WELCOME KIT!' : 'COPY WELCOME EMAIL KIT'}
+              {copiedKit ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedKit ? "WELCOME KIT COPIED TO CLIPBOARD" : "COPY FORM WELCOME KIT LUNCHLETTER"}
             </button>
           </div>
         </div>
 
-        {/* Right Column: Live Authorized User list */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6 space-y-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <span className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase block">ENFORCED LIST</span>
-                <h3 className="text-sm font-mono font-bold text-zinc-100 tracking-wider uppercase">Active Access Authorization Entries</h3>
+        {/* Right Column: User Management Table */}
+        <div className="lg:col-span-7 bg-zinc-950 border border-zinc-900 rounded-lg p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-4 border-b border-zinc-900 pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-zinc-400" />
+                <h2 className="text-xs font-mono font-bold text-zinc-200 uppercase tracking-wider">
+                  AUTHORIZED USERS ROSTER ({authorizedUsers.length})
+                </h2>
               </div>
-              <span className="text-[10px] font-mono bg-zinc-900/50 border border-zinc-800 text-zinc-400 px-2 py-0.5 rounded uppercase">
-                {authorizedUsers.length} Active Accounts
-              </span>
+              <span className="text-[9px] font-mono text-zinc-500 uppercase">ACTIVE POLICY // STRICT AUTH</span>
             </div>
 
-            <div className="overflow-x-auto">              <table className="w-full text-left text-xs font-mono border-collapse">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-mono border-collapse">
                 <thead>
                   <tr className="border-b border-zinc-900 text-[9px] text-zinc-500 uppercase tracking-widest">
                     <th className="pb-3 font-normal">EMAIL ADDRESS</th>
                     <th className="pb-3 font-normal">ACCESS LEVEL</th>
                     <th className="pb-3 font-normal">ASSIGNED PASSWORD</th>
                     <th className="pb-3 font-normal">STATUS</th>
-                    <th className="pb-3 font-normal">MEMORANDUM / NOTES</th>
-                    <th className="pb-3 font-normal text-right">DISPATCH / ACTION</th>
+                    <th className="pb-3 font-normal">MEMORANDUM</th>
+                    <th className="pb-3 font-normal text-right">ACTION</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-900">
@@ -354,20 +380,22 @@ Please use these credentials to sign in directly.
                     <tr>
                       <td colSpan={6} className="py-8 text-center text-zinc-600 uppercase text-[10px] leading-relaxed">
                         <ShieldAlert className="w-5 h-5 text-zinc-700 mx-auto mb-2" />
-                        NO AUTHORIZED USERS REGISTERED YET.<br />
-                        CREATE A SPONSOR OR JUDGE ACCOUNT ON THE LEFT.
+                        NO AUTHORIZED USERS REGISTERED YET.
                       </td>
                     </tr>
                   ) : (
                     authorizedUsers.map(user => {
                       const isEditing = user.id === editingUserId;
-                      const isPassVisible = !!visiblePasswords[user.id];
+                      const isPassVisible = canSeePasswords && !!visiblePasswords[user.id];
+                      const isAdminUser = user.role === 'Admin';
+                      const canModify = !isAdminUser || isCurrentUserAdmin;
+
                       return (
                         <tr key={user.id} className="hover:bg-zinc-900/10 transition-all align-middle">
-                          <td className="py-3.5 text-zinc-200 pr-4 font-bold max-w-[140px] truncate" title={user.email}>
+                          <td className="py-3.5 text-zinc-200 pr-3 font-bold max-w-[130px] truncate" title={user.email}>
                             {user.email}
                           </td>
-                          <td className="py-3.5 pr-4">
+                          <td className="py-3.5 pr-3">
                             {isEditing ? (
                               <div className="flex flex-col gap-1.5">
                                 <select
@@ -375,7 +403,7 @@ Please use these credentials to sign in directly.
                                   onChange={(e) => setEditRole(e.target.value as any)}
                                   className="bg-black border border-zinc-900 rounded px-1.5 py-1 text-[11px] font-mono text-zinc-200 focus:outline-none focus:border-zinc-800"
                                 >
-                                  <option value="Admin">Admin</option>
+                                  {isCurrentUserAdmin && <option value="Admin">Admin</option>}
                                   <option value="Team">Team</option>
                                   <option value="Sponsor">Sponsor</option>
                                   <option value="Judge">Judge</option>
@@ -388,6 +416,7 @@ Please use these credentials to sign in directly.
                                   >
                                     <option value="Design">Design</option>
                                     <option value="Engineering">Engineering</option>
+                                    <option value="PM">PM</option>
                                   </select>
                                 )}
                               </div>
@@ -412,7 +441,7 @@ Please use these credentials to sign in directly.
                               </div>
                             )}
                           </td>
-                          <td className="py-3.5 pr-4 text-zinc-300">
+                          <td className="py-3.5 pr-3 text-zinc-300">
                             {isEditing ? (
                               <input
                                 type="text"
@@ -425,35 +454,40 @@ Please use these credentials to sign in directly.
                                 <span className="text-[11px]">
                                   {isPassVisible ? (user.password || '—') : '••••••••'}
                                 </span>
-                                <button
-                                  onClick={() => togglePasswordVisibility(user.id)}
-                                  className="text-zinc-650 hover:text-zinc-400"
-                                  title="Toggle Visibility"
-                                >
-                                  {isPassVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                                </button>
+                                {canSeePasswords && (
+                                  <button
+                                    onClick={() => togglePasswordVisibility(user.id)}
+                                    className="text-zinc-650 hover:text-zinc-400"
+                                    title="Toggle Visibility"
+                                  >
+                                    {isPassVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                                  </button>
+                                )}
                               </div>
                             )}
                           </td>
-                          <td className="py-3.5 pr-4">
+                          <td className="py-3.5 pr-3">
                             <button
+                              disabled={!canModify}
                               onClick={() => {
                                 onUpdateAuthorizedUser({
                                   ...user,
                                   is_greenlit: !user.is_greenlit
                                 });
                               }}
-                              className={`text-[9px] font-mono uppercase px-2.5 py-1 rounded-full border transition-colors cursor-pointer font-bold ${
+                              className={`text-[9px] font-mono uppercase px-2.5 py-1 rounded-full border transition-colors font-bold ${
+                                !canModify ? 'opacity-50 cursor-not-allowed ' : 'cursor-pointer '
+                              }${
                                 user.is_greenlit
                                   ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/40 hover:bg-emerald-900/20'
                                   : 'bg-zinc-900/60 text-zinc-500 border-zinc-800/60 hover:bg-zinc-800/30'
                               }`}
-                              title={user.is_greenlit ? "Click to suspend / make dormant" : "Click to greenlight account"}
+                              title={!canModify ? "Admin accounts can only be modified by Administrators" : (user.is_greenlit ? "Click to suspend" : "Click to greenlight")}
                             >
                               {user.is_greenlit ? '● GREENLIT' : '○ DORMANT'}
                             </button>
                           </td>
-                          <td className="py-3.5 text-zinc-400 pr-4 max-w-[150px] truncate" title={user.notes}>
+                          <td className="py-3.5 text-zinc-400 pr-3 max-w-[120px] truncate" title={user.notes}>
                             {isEditing ? (
                               <input
                                 type="text"
@@ -466,7 +500,7 @@ Please use these credentials to sign in directly.
                             )}
                           </td>
                           <td className="py-3.5 text-right">
-                            <div className="flex items-center justify-end gap-2">
+                            <div className="flex items-center justify-end gap-1.5">
                               {isEditing ? (
                                 <>
                                   <button
@@ -501,24 +535,28 @@ Please use these credentials to sign in directly.
                                       </>
                                     )}
                                   </button>
-                                  <button
-                                    onClick={() => startEdit(user)}
-                                    className="text-zinc-500 hover:text-white p-1 rounded transition-colors cursor-pointer"
-                                    title="Edit details"
-                                  >
-                                    <Edit2 className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      if (confirm(`Revoke authorization and delete account credentials for "${user.email}"?`)) {
-                                        onDeleteAuthorizedUser(user.id);
-                                      }
-                                    }}
-                                    className="text-zinc-650 hover:text-rose-400 p-1 rounded transition-colors cursor-pointer"
-                                    title="Revoke Permission"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
+                                  {canModify && (
+                                    <>
+                                      <button
+                                        onClick={() => startEdit(user)}
+                                        className="text-zinc-500 hover:text-white p-1 rounded transition-colors cursor-pointer"
+                                        title="Edit details"
+                                      >
+                                        <Edit2 className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          if (confirm(`Revoke authorization and delete account credentials for "${user.email}"?`)) {
+                                            onDeleteAuthorizedUser(user.id);
+                                          }
+                                        }}
+                                        className="text-zinc-650 hover:text-rose-400 p-1 rounded transition-colors cursor-pointer"
+                                        title="Revoke Permission"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </>
+                                  )}
                                 </>
                               )}
                             </div>
@@ -534,173 +572,13 @@ Please use these credentials to sign in directly.
             <div className="bg-black/40 border border-zinc-900 rounded p-4 flex items-start gap-3 mt-4 text-[10px] font-mono text-zinc-500 uppercase leading-relaxed">
               <Info className="w-4 h-4 text-zinc-400 shrink-0 mt-0.5" />
               <div>
-                <span className="text-zinc-300 font-bold block mb-1">PRIVACY COMPLIANCE NOTICE</span>
-                ALL DATA ASSOCIATED WITH CAR ITERATIONS, DESIGN SPECIFICATIONS, WIND-TUNNEL ANALYSIS, AND SPONSOR PROCUREMENT REMAIN FULLY ENCRYPTED AND VISIBLE ONLY TO AUTHORIZED ACCOUNTS REGISTERED IN THIS REPOSITORY. UNREGISTERED GUESTS OR SYSTEM BROWSERS CANNOT DISCOVER SYSTEM DATA AS CONTROLLERS MANDATE TOKEN MATCHES IN SUPABASE ROW-LEVEL SECURITY POLICIES.
+                <span className="text-zinc-300 font-bold block mb-1">ROLE ACCESS POLICY &amp; SECURITY GUARANTEE</span>
+                TEAM MEMBERS HAVE FULL ADMINISTRATIVE ACCESS TO ALL SYSTEM MODULES, BUT CANNOT ALTER OR DELETE ADMIN ACCOUNTS, NOR VIEW OTHER USERS' PASSWORDS. PASSWORDS REMAIN STRICTLY MASKED AND PROTECTED UNLESS LOGGED IN WITH ADMIN OR JUDGE ROLES.
               </div>
-            </div>
-
-            {/* Supabase SQL Assistant Section */}
-            <details className="group border border-zinc-900 rounded mt-4 bg-zinc-950">
-              <summary className="flex justify-between items-center p-3 text-[10px] font-mono text-zinc-400 uppercase tracking-widest cursor-pointer select-none group-open:border-b group-open:border-zinc-900">
-                <span>⚡ SUPABASE SQL DATABASE MIGRATION GUIDE</span>
-                <span className="text-zinc-600 group-open:rotate-180 transition-transform">▼</span>
-              </summary>
-              <div className="p-4 space-y-3">
-                <p className="text-[10px] font-mono text-zinc-500 uppercase leading-relaxed">
-                  Run the following SQL snippet in your Supabase SQL Editor to make sure the Authorization table supports admin-created passwords:
-                </p>
-                <div className="relative">
-                  <pre className="bg-black text-[9px] text-zinc-300 font-mono p-3 rounded border border-zinc-900 overflow-x-auto select-all whitespace-pre">
-{`-- Run this to update existing tables to support greenlighting:
-ALTER TABLE authorized_users ADD COLUMN IF NOT EXISTS is_greenlit BOOLEAN DEFAULT FALSE;
-
--- Update admin accounts to be greenlit automatically:
-UPDATE authorized_users SET is_greenlit = TRUE WHERE email LIKE '%@cardinalsystems.org';
-
--- Schema Table Definitions:
-CREATE TABLE IF NOT EXISTS authorized_users (
-  id TEXT PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('Team', 'Sponsor', 'Judge')),
-  password TEXT NOT NULL,
-  notes TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  is_greenlit BOOLEAN DEFAULT FALSE
-);
-
-CREATE TABLE IF NOT EXISTS account_requests (
-  id TEXT PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  notes TEXT,
-  status TEXT DEFAULT 'Pending',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS sponsor_commitments (
-  id TEXT PRIMARY KEY,
-  sponsor_email TEXT NOT NULL,
-  sponsor_name TEXT NOT NULL,
-  title TEXT NOT NULL,
-  description TEXT NOT NULL,
-  due_date TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('In Queue', 'In Progress', 'Fulfilled')),
-  assigned_by TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Enable Row-Level Security (RLS)
-ALTER TABLE authorized_users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE account_requests ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sponsor_commitments ENABLE ROW LEVEL SECURITY;
-
--- Drop existing policies if any
-DROP POLICY IF EXISTS "Public Read Authorized" ON authorized_users;
-DROP POLICY IF EXISTS "Admin Write Authorized" ON authorized_users;
-DROP POLICY IF EXISTS "Public request inserts" ON account_requests;
-DROP POLICY IF EXISTS "Authenticated request controls" ON account_requests;
-DROP POLICY IF EXISTS "Public commitments read" ON sponsor_commitments;
-DROP POLICY IF EXISTS "Auth commitments write" ON sponsor_commitments;
-
--- Security Policies (Permits writes from both standard Auth and direct password session which runs as anon)
-CREATE POLICY "Public Read Authorized" ON authorized_users FOR SELECT USING (true);
-CREATE POLICY "Admin Write Authorized" ON authorized_users FOR ALL USING (true);
-
-CREATE POLICY "Public request inserts" ON account_requests FOR INSERT WITH CHECK (true);
-CREATE POLICY "Authenticated request controls" ON account_requests FOR ALL USING (true);
-
-CREATE POLICY "Public commitments read" ON sponsor_commitments FOR SELECT USING (true);
-CREATE POLICY "Auth commitments write" ON sponsor_commitments FOR ALL USING (true);
-
--- Enable Supabase Realtime Replication for All tables
-ALTER PUBLICATION supabase_realtime ADD TABLE nodes;
-ALTER PUBLICATION supabase_realtime ADD TABLE cad_iterations;
-ALTER PUBLICATION supabase_realtime ADD TABLE expenditures;
-ALTER PUBLICATION supabase_realtime ADD TABLE news_updates;
-ALTER PUBLICATION supabase_realtime ADD TABLE judge_feedback;
-ALTER PUBLICATION supabase_realtime ADD TABLE authorized_users;
-ALTER PUBLICATION supabase_realtime ADD TABLE account_requests;
-ALTER PUBLICATION supabase_realtime ADD TABLE sponsor_commitments;`}
-                  </pre>
-                </div>
-              </div>
-            </details>
-          </div>
-
-          {/* Pending Registration Requests card */}
-          <div className="bg-zinc-950 border border-zinc-900 rounded-lg p-6 space-y-4 mt-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <span className="text-[10px] font-mono text-zinc-500 tracking-widest uppercase block font-bold">REQUESTS QUEUE</span>
-                <h3 className="text-sm font-mono font-bold text-zinc-100 tracking-wider uppercase">Pending Invitation Requests</h3>
-              </div>
-              <span className="text-[10px] font-mono bg-zinc-900/50 border border-zinc-800 text-zinc-400 px-2 py-0.5 rounded uppercase">
-                {accountRequests.length} Pending
-              </span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono border-collapse">
-                <thead>
-                  <tr className="border-b border-zinc-900 text-[9px] text-zinc-550 uppercase tracking-widest">
-                    <th className="pb-3 font-normal">EMAIL IDENTIFIER</th>
-                    <th className="pb-3 font-normal">NOTE / ORG</th>
-                    <th className="pb-3 font-normal">REQUEST DATE</th>
-                    <th className="pb-3 font-normal text-right">RESOLVE</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-900">
-                  {accountRequests.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="py-6 text-center text-zinc-600 uppercase text-[9px]">
-                        No pending registration requests recorded.
-                      </td>
-                    </tr>
-                  ) : (
-                    accountRequests.map(req => (
-                      <tr key={req.id} className="hover:bg-zinc-900/10 transition-all">
-                        <td className="py-3 pr-4 text-zinc-200 font-bold max-w-[120px] truncate" title={req.email}>
-                          {req.email}
-                        </td>
-                        <td className="py-3 pr-4 text-zinc-400 max-w-[150px] truncate" title={req.notes || 'N/A'}>
-                          {req.notes || <span className="text-zinc-700 italic">None</span>}
-                        </td>
-                        <td className="py-3 pr-4 text-zinc-500">
-                          {req.created_at ? req.created_at.split('T')[0] : 'N/A'}
-                        </td>
-                        <td className="py-3 text-right">
-                          <div className="flex items-center justify-end gap-3">
-                            <button
-                              onClick={() => {
-                                setEmail(req.email);
-                                setNotes(req.notes || `Assigned Sponsor credentials`);
-                                setRole('Sponsor');
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                              }}
-                              className="text-[9px] font-mono text-emerald-450 hover:text-white px-2 py-1 rounded bg-emerald-950/20 border border-emerald-900/40 hover:bg-emerald-900/50 transition-colors uppercase font-bold cursor-pointer"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (confirm(`Decline and delete access request for "${req.email}"?`)) {
-                                  onDeleteAccountRequest(req.id);
-                                }
-                              }}
-                              className="text-zinc-650 hover:text-rose-400 p-1 rounded transition-colors cursor-pointer"
-                              title="Delete Request"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
             </div>
           </div>
         </div>
+
       </div>
     </div>
   );
