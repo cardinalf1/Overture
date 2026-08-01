@@ -18,11 +18,12 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
-  // Scaled dimensions with NO left ID panel (0px) & compact lane allocation
-  const DAY_WIDTH = 100;
-  const ROW_HEIGHT = 160;
-  const HEADER_HEIGHT = 90;
-  const LEFT_PANEL_WIDTH = 0; // Removed left ID column completely
+  // --- Normal Web App Dimensions (Pristine, elegant, legible on-screen) ---
+  const APP_DAY_WIDTH = 72;
+  const APP_ROW_HEIGHT = 84;
+  const APP_HEADER_HEIGHT = 54;
+  const APP_LEFT_PANEL_WIDTH = 110;
+  const APP_DEPT_HEADER_HEIGHT = 34;
 
   // Date Math Helpers
   const parseDate = (d: string) => new Date(d).getTime();
@@ -55,166 +56,276 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
     return d.toISOString().split('T')[0]; // YYYY-MM-DD
   });
 
-  const getX = (dateStr: string) => LEFT_PANEL_WIDTH + getDaysDiff(days[0], dateStr) * DAY_WIDTH;
-  const getW = (startStr: string, endStr: string) => (getDaysDiff(startStr, endStr) + 1) * DAY_WIDTH;
+  const getAppX = (dateStr: string) => APP_LEFT_PANEL_WIDTH + getDaysDiff(days[0], dateStr) * APP_DAY_WIDTH;
+  const getAppW = (startStr: string, endStr: string) => (getDaysDiff(startStr, endStr) + 1) * APP_DAY_WIDTH;
+  const appTotalWidth = APP_LEFT_PANEL_WIDTH + (totalDays * APP_DAY_WIDTH);
 
-  const totalWidth = LEFT_PANEL_WIDTH + (totalDays * DAY_WIDTH);
+  // Group nodes by department (No overlapping rows!)
+  const grouped = nodes.reduce((acc, node) => {
+    if (!acc[node.department]) acc[node.department] = [];
+    acc[node.department].push(node);
+    return acc;
+  }, {} as Record<string, Node[]>);
 
-  // --- COMPACT TRACK PACKING ALGORITHM (Only make new lines if needed!) ---
-  const getStartMs = (node: Node) => {
-    const p = parseDate(node.planned_start);
-    const a = node.actual_start ? parseDate(node.actual_start) : Infinity;
-    return Math.min(p, a);
-  };
+  // Render Web App Elements
+  let appCurrentY = APP_HEADER_HEIGHT;
+  const appSvgElements: React.JSX.Element[] = [];
 
-  const getEndMs = (node: Node) => {
-    const p = parseDate(node.planned_end);
-    const a = node.actual_end ? parseDate(node.actual_end) : (node.status === 'In Progress' ? simulatedTime : p);
-    return Math.max(p, a);
-  };
+  Object.entries(grouped).forEach(([dept, deptNodes]) => {
+    // Department Section Header
+    appSvgElements.push(
+      <g key={`dept-${dept}`}>
+        <rect x={0} y={appCurrentY} width={appTotalWidth} height={APP_DEPT_HEADER_HEIGHT} fill="#09090b" />
+        <text
+          x={16}
+          y={appCurrentY + 23}
+          fill="#a1a1aa"
+          fontSize="15"
+          fontFamily="monospace"
+          fontWeight="bold"
+          letterSpacing="2"
+        >
+          // {dept.toUpperCase()}
+        </text>
+        <line x1={0} y1={appCurrentY + APP_DEPT_HEADER_HEIGHT} x2={appTotalWidth} y2={appCurrentY + APP_DEPT_HEADER_HEIGHT} stroke="#27272a" strokeWidth="1.5" />
+      </g>
+    );
+    appCurrentY += APP_DEPT_HEADER_HEIGHT;
 
-  const sortedNodes = [...nodes].sort((a, b) => {
-    const startDiff = getStartMs(a) - getStartMs(b);
-    if (startDiff !== 0) return startDiff;
-    return getEndMs(a) - getEndMs(b);
-  });
+    deptNodes.forEach(node => {
+      const plannedX = getAppX(node.planned_start);
+      const plannedW = getAppW(node.planned_start, node.planned_end);
 
-  const trackEndTimes: number[] = [];
-  const packedNodes: {
-    node: Node;
-    trackIndex: number;
-    plannedX: number;
-    plannedW: number;
-    actualX: number;
-    actualW: number;
-  }[] = [];
-  const BUFFER_MS = 12 * 60 * 60 * 1000; // 12hr buffer
+      const actualStart = node.actual_start || node.planned_start;
+      const actualEnd = node.actual_end || (node.status === 'In Progress' ? simulatedDate : actualStart);
+      const actualX = getAppX(actualStart);
+      const actualW = getAppW(actualStart, actualEnd);
 
-  sortedNodes.forEach(node => {
-    const startMs = getStartMs(node);
-    const endMs = getEndMs(node);
+      const bgColor = DEPT_COLORS[node.department as Department] || '#71717a';
+      const textColor = node.department === 'PM' || node.department === 'Design' ? '#000000' : '#ffffff';
 
-    let assignedTrack = -1;
-    for (let t = 0; t < trackEndTimes.length; t++) {
-      if (trackEndTimes[t] + BUFFER_MS <= startMs) {
-        assignedTrack = t;
-        break;
+      let durationText = '';
+      if (node.actual_start) {
+        const numDays = getDaysDiff(node.actual_start, node.actual_end || simulatedDate) + 1;
+        durationText = node.actual_end ? `${numDays}d` : `${numDays}d (ip)`;
       }
-    }
 
-    if (assignedTrack === -1) {
-      assignedTrack = trackEndTimes.length;
-      trackEndTimes.push(endMs);
-    } else {
-      trackEndTimes[assignedTrack] = endMs;
-    }
+      appSvgElements.push(
+        <g key={`node-${node.id}`} style={{ cursor: 'pointer' }} onClick={() => setSelectedNode(node)}>
+          {/* Row Background & Divider */}
+          <rect x={0} y={appCurrentY} width={appTotalWidth} height={APP_ROW_HEIGHT} fill="none" />
+          <line x1={0} y1={appCurrentY + APP_ROW_HEIGHT} x2={appTotalWidth} y2={appCurrentY + APP_ROW_HEIGHT} stroke="#18181b" strokeWidth="1.5" />
 
-    const plannedX = getX(node.planned_start);
-    const plannedW = getW(node.planned_start, node.planned_end);
-    const actualStart = node.actual_start || node.planned_start;
-    const actualEnd = node.actual_end || (node.status === 'In Progress' ? simulatedDate : actualStart);
-    const actualX = getX(actualStart);
-    const actualW = getW(actualStart, actualEnd);
+          {/* Left Panel ID */}
+          <rect x={0} y={appCurrentY} width={APP_LEFT_PANEL_WIDTH} height={APP_ROW_HEIGHT} fill="#000000" />
+          <text x={16} y={appCurrentY + 54} fill="#a1a1aa" fontSize="15" fontFamily="monospace" fontWeight="bold">{node.id}</text>
+          <line x1={APP_LEFT_PANEL_WIDTH} y1={appCurrentY} x2={APP_LEFT_PANEL_WIDTH} y2={appCurrentY + APP_ROW_HEIGHT} stroke="#27272a" strokeWidth="1.5" />
 
-    packedNodes.push({
-      node,
-      trackIndex: assignedTrack,
-      plannedX,
-      plannedW,
-      actualX,
-      actualW
+          {/* Task Name Title */}
+          <text
+            x={plannedX}
+            y={appCurrentY + 28}
+            fill="#ffffff"
+            fontSize="16"
+            fontFamily="monospace"
+            fontWeight="bold"
+          >
+            {node.title} {node.dependency && `[DEP: ${node.dependency}]`}
+          </text>
+
+          {/* Planned Container Bar */}
+          <rect
+            x={plannedX}
+            y={appCurrentY + 36}
+            width={plannedW}
+            height={14}
+            fill="#27272a"
+            rx="4"
+          />
+
+          {/* Actual Progress Bar & Duration Text */}
+          {node.actual_start && (
+            <g>
+              <rect
+                x={actualX}
+                y={appCurrentY + 54}
+                width={actualW}
+                height={22}
+                fill={bgColor}
+                rx="6"
+              />
+              <text
+                x={actualX + 10}
+                y={appCurrentY + 70}
+                fill={textColor}
+                fontSize="13"
+                fontFamily="monospace"
+                fontWeight="bold"
+              >
+                {durationText}
+              </text>
+            </g>
+          )}
+        </g>
+      );
+      appCurrentY += APP_ROW_HEIGHT;
     });
   });
 
-  const totalTracks = Math.max(1, trackEndTimes.length);
-  const totalHeight = HEADER_HEIGHT + (totalTracks * ROW_HEIGHT);
+  const appTotalHeight = appCurrentY;
+  const appSimulatedX = getAppX(simulatedDate) + (APP_DAY_WIDTH / 2);
 
+  // --- PRESENTATION SVG EXPORT (Non-Overlapping Department Rows, High Visibility) ---
   const handleExport = () => {
-    if (!svgRef.current) return;
+    const EXPORT_DAY_WIDTH = 120;
+    const EXPORT_ROW_HEIGHT = 130;
+    const EXPORT_HEADER_HEIGHT = 74;
+    const EXPORT_LEFT_PANEL_WIDTH = 140;
+    const EXPORT_DEPT_HEADER_HEIGHT = 44;
 
-    let svgData = new XMLSerializer().serializeToString(svgRef.current);
-    svgData = '<?xml version="1.0" standalone="no"?>\n<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n' + svgData;
+    const getExportX = (dateStr: string) => EXPORT_LEFT_PANEL_WIDTH + getDaysDiff(days[0], dateStr) * EXPORT_DAY_WIDTH;
+    const getExportW = (startStr: string, endStr: string) => (getDaysDiff(startStr, endStr) + 1) * EXPORT_DAY_WIDTH;
+    const exportTotalWidth = EXPORT_LEFT_PANEL_WIDTH + (totalDays * EXPORT_DAY_WIDTH);
+
+    let exportY = EXPORT_HEADER_HEIGHT;
+    const exportElements: string[] = [];
+
+    // Header Background & Lines
+    exportElements.push(`
+      <rect x="0" y="0" width="${exportTotalWidth}" height="${EXPORT_HEADER_HEIGHT}" fill="#000000"/>
+      <line x1="0" y1="${EXPORT_HEADER_HEIGHT}" x2="${exportTotalWidth}" y2="${EXPORT_HEADER_HEIGHT}" stroke="#27272a" stroke-width="3"/>
+    `);
+
+    // Date Headers
+    days.forEach((day, i) => {
+      const dateObj = new Date(day);
+      const formattedDate = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
+      const x = EXPORT_LEFT_PANEL_WIDTH + i * EXPORT_DAY_WIDTH + (EXPORT_DAY_WIDTH / 2);
+      exportElements.push(`
+        <text x="${x}" y="48" fill="#a1a1aa" font-size="24" font-family="monospace" font-weight="bold" text-anchor="middle">${formattedDate}</text>
+        <line x1="${EXPORT_LEFT_PANEL_WIDTH + i * EXPORT_DAY_WIDTH}" y1="${EXPORT_HEADER_HEIGHT}" x2="${EXPORT_LEFT_PANEL_WIDTH + i * EXPORT_DAY_WIDTH}" y2="99999" stroke="#18181b" stroke-width="2"/>
+      `);
+    });
+
+    // TODAY Line
+    const exportSimulatedX = getExportX(simulatedDate) + (EXPORT_DAY_WIDTH / 2);
+    exportElements.push(`
+      <g>
+        <line x1="${exportSimulatedX}" y1="${EXPORT_HEADER_HEIGHT}" x2="${exportSimulatedX}" y2="99999" stroke="#ef4444" stroke-width="4" stroke-dasharray="8 6"/>
+        <rect x="${exportSimulatedX - 45}" y="${EXPORT_HEADER_HEIGHT + 8}" width="90" height="28" fill="#ef4444" rx="6"/>
+        <text x="${exportSimulatedX}" y="${EXPORT_HEADER_HEIGHT + 27}" fill="#ffffff" font-size="15" font-family="monospace" font-weight="bold" text-anchor="middle">TODAY</text>
+      </g>
+    `);
+
+    // Department Sections & Non-Overlapping Rows
+    Object.entries(grouped).forEach(([dept, deptNodes]) => {
+      exportElements.push(`
+        <rect x="0" y="${exportY}" width="${exportTotalWidth}" height="${EXPORT_DEPT_HEADER_HEIGHT}" fill="#09090b"/>
+        <text x="20" y="${exportY + 30}" fill="#a1a1aa" font-size="22" font-family="monospace" font-weight="bold" letter-spacing="3">// ${dept.toUpperCase()}</text>
+        <line x1="0" y1="${exportY + EXPORT_DEPT_HEADER_HEIGHT}" x2="${exportTotalWidth}" y2="${exportY + EXPORT_DEPT_HEADER_HEIGHT}" stroke="#27272a" stroke-width="3"/>
+      `);
+      exportY += EXPORT_DEPT_HEADER_HEIGHT;
+
+      deptNodes.forEach(node => {
+        const plannedX = getExportX(node.planned_start);
+        const plannedW = getExportW(node.planned_start, node.planned_end);
+        const actualStart = node.actual_start || node.planned_start;
+        const actualEnd = node.actual_end || (node.status === 'In Progress' ? simulatedDate : actualStart);
+        const actualX = getExportX(actualStart);
+        const actualW = getExportW(actualStart, actualEnd);
+
+        const bgColor = DEPT_COLORS[node.department as Department] || '#71717a';
+        const textColor = node.department === 'PM' || node.department === 'Design' ? '#000000' : '#ffffff';
+
+        let durationText = '';
+        if (node.actual_start) {
+          const numDays = getDaysDiff(node.actual_start, node.actual_end || simulatedDate) + 1;
+          durationText = node.actual_end ? `${numDays}d` : `${numDays}d (ip)`;
+        }
+
+        const titleText = `${node.title}${node.dependency ? ` [DEP: ${node.dependency}]` : ''}`;
+
+        exportElements.push(`
+          <g>
+            <line x1="0" y1="${exportY + EXPORT_ROW_HEIGHT}" x2="${exportTotalWidth}" y2="${exportY + EXPORT_ROW_HEIGHT}" stroke="#18181b" stroke-width="2"/>
+            <rect x="0" y="${exportY}" width="${EXPORT_LEFT_PANEL_WIDTH}" height="${EXPORT_ROW_HEIGHT}" fill="#000000"/>
+            <text x="20" y="${exportY + 80}" fill="#a1a1aa" font-size="24" font-family="monospace" font-weight="bold">${node.id}</text>
+            <line x1="${EXPORT_LEFT_PANEL_WIDTH}" y1="${exportY}" x2="${EXPORT_LEFT_PANEL_WIDTH}" y2="${exportY + EXPORT_ROW_HEIGHT}" stroke="#27272a" stroke-width="3"/>
+
+            <text x="${plannedX}" y="${exportY + 42}" fill="#ffffff" font-size="28" font-family="monospace" font-weight="bold">${titleText}</text>
+            <rect x="${plannedX}" y="${exportY + 54}" width="${plannedW}" height="18" fill="#27272a" rx="6"/>
+            ${node.actual_start ? `
+              <rect x="${actualX}" y="${exportY + 78}" width="${actualW}" height="38" fill="${bgColor}" rx="8"/>
+              <text x="${actualX + 16}" y="${exportY + 104}" fill="${textColor}" font-size="22" font-family="monospace" font-weight="bold">${durationText}</text>
+            ` : ''}
+          </g>
+        `);
+        exportY += EXPORT_ROW_HEIGHT;
+      });
+    });
+
+    // Replace dummy height with exact exportY
+    const finalElements = exportElements.join('\n').replace(/99999/g, exportY.toString());
+
+    let svgData = `<?xml version="1.0" standalone="no"?>\n<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n<svg width="${exportTotalWidth}" height="${exportY}" viewBox="0 0 ${exportTotalWidth} ${exportY}" xmlns="http://www.w3.org/2000/svg" style="background-color: #000000;">\n<rect x="0" y="0" width="${exportTotalWidth}" height="${exportY}" fill="#000000"/>\n${finalElements}\n</svg>`;
 
     const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'cardinal-gantt-maximized.svg';
+    link.download = 'cardinal-gantt-presentation.svg';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  const simulatedX = getX(simulatedDate) + (DAY_WIDTH / 2);
-
   return (
     <div className="flex flex-col h-full bg-black border border-zinc-800 rounded-lg overflow-hidden font-sans">
-      {/* Header Bar */}
+      {/* Web App Header Bar */}
       <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950 shrink-0">
         <div>
           <h2 className="text-sm font-mono uppercase tracking-wider text-zinc-200 font-bold">
-            Gantt Timeline ({nodes.length} Tasks packed into {totalTracks} Lane{totalTracks > 1 ? 's' : ''})
+            Active Gantt / Timeline ({nodes.length} Nodes)
           </h2>
-          <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block mt-0.5">
-            Full-Width Maximized Presentation Vector Export
-          </span>
         </div>
-        <div className="flex items-center gap-5">
-          <div className="flex gap-4 text-xs font-mono text-zinc-300">
-            <div className="flex items-center gap-1.5"><div className="w-3.5 h-3.5 bg-[#f4f4f5] rounded-sm"></div> PM</div>
-            <div className="flex items-center gap-1.5"><div className="w-3.5 h-3.5 bg-[#d4d4d8] rounded-sm"></div> Design</div>
-            <div className="flex items-center gap-1.5"><div className="w-3.5 h-3.5 bg-[#71717a] rounded-sm"></div> Eng</div>
-            <div className="flex items-center gap-1.5"><div className="w-3.5 h-3.5 bg-[#3f3f46] rounded-sm"></div> Everyone</div>
+        <div className="flex items-center gap-4">
+          <div className="flex gap-4 text-xs font-mono text-zinc-400">
+            <div className="flex items-center gap-2"><div className="w-4 h-2 bg-zinc-100 rounded-sm"></div> PM</div>
+            <div className="flex items-center gap-2"><div className="w-4 h-2 bg-zinc-300 rounded-sm"></div> Design</div>
+            <div className="flex items-center gap-2"><div className="w-4 h-2 bg-zinc-500 rounded-sm"></div> Eng</div>
+            <div className="flex items-center gap-2"><div className="w-4 h-2 bg-zinc-700 rounded-sm"></div> Everyone</div>
           </div>
           <button
             onClick={handleExport}
             className="flex items-center gap-2 text-xs font-mono bg-zinc-100 text-black px-4 py-2 rounded hover:bg-white transition-colors font-bold tracking-wider cursor-pointer shadow-lg"
           >
             <Download className="w-4 h-4" />
-            EXPORT MAXIMIZED SVG
+            EXPORT PRESENTATION SVG
           </button>
         </div>
       </div>
 
-      {/* SVG Timeline Canvas */}
+      {/* On-Screen Web App SVG Timeline Canvas */}
       <div className="flex-1 overflow-auto bg-black">
         <svg
           ref={svgRef}
-          width={totalWidth}
-          height={totalHeight}
-          viewBox={`0 0 ${totalWidth} ${totalHeight}`}
+          width={appTotalWidth}
+          height={appTotalHeight}
+          viewBox={`0 0 ${appTotalWidth} ${appTotalHeight}`}
           xmlns="http://www.w3.org/2000/svg"
           style={{ backgroundColor: '#000000' }}
         >
-          {/* Solid Black Canvas Background */}
-          <rect x={0} y={0} width={totalWidth} height={totalHeight} fill="#000000" />
-
-          {/* Vertical Day Grid Lines */}
+          {/* Grid Background Lines */}
           <g>
             {days.map((day, i) => (
               <line
                 key={`grid-${day}`}
-                x1={LEFT_PANEL_WIDTH + i * DAY_WIDTH}
-                y1={HEADER_HEIGHT}
-                x2={LEFT_PANEL_WIDTH + i * DAY_WIDTH}
-                y2={totalHeight}
+                x1={APP_LEFT_PANEL_WIDTH + i * APP_DAY_WIDTH}
+                y1={APP_HEADER_HEIGHT}
+                x2={APP_LEFT_PANEL_WIDTH + i * APP_DAY_WIDTH}
+                y2={appTotalHeight}
                 stroke="#18181b"
-                strokeWidth="2.5"
-              />
-            ))}
-          </g>
-
-          {/* Lane Divider Horizontal Lines */}
-          <g>
-            {Array.from({ length: totalTracks }).map((_, t) => (
-              <line
-                key={`lane-line-${t}`}
-                x1={0}
-                y1={HEADER_HEIGHT + (t + 1) * ROW_HEIGHT}
-                x2={totalWidth}
-                y2={HEADER_HEIGHT + (t + 1) * ROW_HEIGHT}
-                stroke="#27272a"
-                strokeWidth="2.5"
+                strokeWidth="1.5"
               />
             ))}
           </g>
@@ -222,27 +333,27 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
           {/* Simulated TODAY Line */}
           <g>
             <line
-              x1={simulatedX}
-              y1={HEADER_HEIGHT}
-              x2={simulatedX}
-              y2={totalHeight}
+              x1={appSimulatedX}
+              y1={APP_HEADER_HEIGHT}
+              x2={appSimulatedX}
+              y2={appTotalHeight}
               stroke="#ef4444"
-              strokeWidth="4"
-              strokeDasharray="8 6"
+              strokeWidth="2.5"
+              strokeDasharray="6 4"
             />
             <rect
-              x={simulatedX - 80}
-              y={HEADER_HEIGHT + 10}
-              width={160}
-              height={44}
+              x={appSimulatedX - 30}
+              y={APP_HEADER_HEIGHT + 5}
+              width={60}
+              height={22}
               fill="#ef4444"
-              rx="8"
+              rx="4"
             />
             <text
-              x={simulatedX}
-              y={HEADER_HEIGHT + 40}
+              x={appSimulatedX}
+              y={APP_HEADER_HEIGHT + 20}
               fill="#ffffff"
-              fontSize="26"
+              fontSize="11"
               fontFamily="monospace"
               fontWeight="bold"
               textAnchor="middle"
@@ -253,18 +364,18 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
 
           {/* Top Date Header */}
           <g>
-            <rect x={0} y={0} width={totalWidth} height={HEADER_HEIGHT} fill="#000000" />
-            <line x1={0} y1={HEADER_HEIGHT} x2={totalWidth} y2={HEADER_HEIGHT} stroke="#27272a" strokeWidth="3" />
+            <rect x={0} y={0} width={appTotalWidth} height={APP_HEADER_HEIGHT} fill="#000000" />
+            <line x1={0} y1={APP_HEADER_HEIGHT} x2={appTotalWidth} y2={APP_HEADER_HEIGHT} stroke="#27272a" strokeWidth="1.5" />
             {days.map((day, i) => {
               const dateObj = new Date(day);
               const formattedDate = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
               return (
                 <text
                   key={`header-${day}`}
-                  x={LEFT_PANEL_WIDTH + i * DAY_WIDTH + (DAY_WIDTH / 2)}
-                  y={56}
+                  x={APP_LEFT_PANEL_WIDTH + i * APP_DAY_WIDTH + (APP_DAY_WIDTH / 2)}
+                  y={34}
                   fill="#a1a1aa"
-                  fontSize="40"
+                  fontSize="14"
                   fontFamily="monospace"
                   fontWeight="bold"
                   textAnchor="middle"
@@ -275,74 +386,8 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             })}
           </g>
 
-          {/* Compact Task Nodes Maximize Space */}
-          <g>
-            {packedNodes.map(({ node, trackIndex, plannedX, plannedW, actualX, actualW }) => {
-              const bgColor = DEPT_COLORS[node.department as Department] || '#71717a';
-              const textColor = node.department === 'PM' || node.department === 'Design' ? '#000000' : '#ffffff';
-              const rowY = HEADER_HEIGHT + trackIndex * ROW_HEIGHT;
-
-              let durationText = '';
-              if (node.actual_start) {
-                const numDays = getDaysDiff(node.actual_start, node.actual_end || simulatedDate) + 1;
-                durationText = node.actual_end ? `${numDays}d` : `${numDays}d (ip)`;
-              }
-
-              return (
-                <g
-                  key={`node-${node.id}`}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => setSelectedNode(node)}
-                >
-                  {/* Task Name Title (HUGE 52px Bold) */}
-                  <text
-                    x={plannedX}
-                    y={rowY + 54}
-                    fill="#ffffff"
-                    fontSize="52"
-                    fontFamily="monospace"
-                    fontWeight="bold"
-                  >
-                    {node.title} {node.dependency && `[DEP: ${node.dependency}]`}
-                  </text>
-
-                  {/* Planned Schedule Container Bar */}
-                  <rect
-                    x={plannedX}
-                    y={rowY + 68}
-                    width={plannedW}
-                    height={20}
-                    fill="#27272a"
-                    rx="8"
-                  />
-
-                  {/* Actual Progress Bar (THICK 52px Bar) & HUGE 38px Duration Text Inside */}
-                  {node.actual_start && (
-                    <g>
-                      <rect
-                        x={actualX}
-                        y={rowY + 96}
-                        width={actualW}
-                        height={52}
-                        fill={bgColor}
-                        rx="12"
-                      />
-                      <text
-                        x={actualX + 20}
-                        y={rowY + 134}
-                        fill={textColor}
-                        fontSize="38"
-                        fontFamily="monospace"
-                        fontWeight="bold"
-                      >
-                        {durationText}
-                      </text>
-                    </g>
-                  )}
-                </g>
-              );
-            })}
-          </g>
+          {/* Department Groups & Rows */}
+          {appSvgElements}
         </svg>
       </div>
 
