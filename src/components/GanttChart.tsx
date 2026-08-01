@@ -8,10 +8,17 @@ interface GanttChartProps {
 }
 
 const DEPT_COLORS: Record<Department, string> = {
-  PM: '#f4f4f5', // zinc-100
-  Design: '#d4d4d8', // zinc-300
-  Engineering: '#71717a', // zinc-500
-  Everyone: '#3f3f46', // zinc-700
+  PM: '#38bdf8', // Sky Blue
+  Design: '#a855f7', // Purple
+  Engineering: '#f43f5e', // Rose
+  Everyone: '#10b981', // Emerald
+};
+
+const DEPT_SHORT: Record<Department, string> = {
+  PM: 'PM',
+  Design: 'DSG',
+  Engineering: 'ENG',
+  Everyone: 'ALL',
 };
 
 export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
@@ -19,9 +26,9 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
   const DAY_WIDTH = 54;
-  const ROW_HEIGHT = 64;
-  const HEADER_HEIGHT = 40;
-  const LEFT_PANEL_WIDTH = 80;
+  const ROW_HEIGHT = 44;
+  const HEADER_HEIGHT = 44;
+  const LEFT_PANEL_WIDTH = 260;
 
   // Date Math Helpers
   const parseDate = (d: string) => new Date(d).getTime();
@@ -58,73 +65,19 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
   const getW = (startStr: string, endStr: string) => (getDaysDiff(startStr, endStr) + 1) * DAY_WIDTH;
 
   const totalWidth = LEFT_PANEL_WIDTH + (totalDays * DAY_WIDTH);
-
-  // --- COMPACT TRACK PACKING ALGORITHM ---
-  const getStartMs = (node: Node) => {
-    const p = parseDate(node.planned_start);
-    const a = node.actual_start ? parseDate(node.actual_start) : Infinity;
-    return Math.min(p, a);
-  };
-
-  const getEndMs = (node: Node) => {
-    const p = parseDate(node.planned_end);
-    const a = node.actual_end ? parseDate(node.actual_end) : (node.status === 'In Progress' ? simulatedTime : p);
-    return Math.max(p, a);
-  };
-
-  const sortedNodes = [...nodes].sort((a, b) => {
-    const startDiff = getStartMs(a) - getStartMs(b);
-    if (startDiff !== 0) return startDiff;
-    return getEndMs(a) - getEndMs(b);
-  });
-
-  const trackEndTimes: number[] = [];
-  const packedNodes: { node: Node; trackIndex: number }[] = [];
-  const BUFFER_MS = 12 * 60 * 60 * 1000; // 12hr buffer between tasks in same lane
-
-  sortedNodes.forEach(node => {
-    const startMs = getStartMs(node);
-    const endMs = getEndMs(node);
-
-    let assignedTrack = -1;
-    for (let t = 0; t < trackEndTimes.length; t++) {
-      if (trackEndTimes[t] + BUFFER_MS <= startMs) {
-        assignedTrack = t;
-        break;
-      }
-    }
-
-    if (assignedTrack === -1) {
-      assignedTrack = trackEndTimes.length;
-      trackEndTimes.push(endMs);
-    } else {
-      trackEndTimes[assignedTrack] = endMs;
-    }
-
-    packedNodes.push({ node, trackIndex: assignedTrack });
-  });
-
-  const totalTracks = Math.max(1, trackEndTimes.length);
-  const totalHeight = HEADER_HEIGHT + (totalTracks * ROW_HEIGHT);
+  const totalHeight = HEADER_HEIGHT + Math.max(1, nodes.length) * ROW_HEIGHT;
 
   const handleExport = () => {
     if (!svgRef.current) return;
 
     let svgData = new XMLSerializer().serializeToString(svgRef.current);
-    
-    // Inject embedded styles for Canva vector crispness if not present
-    if (!svgData.includes('JetBrains Mono')) {
-      const defsBlock = `<defs><style type="text/css">@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&amp;display=swap'); text { font-family: 'JetBrains Mono', 'Courier New', Courier, monospace; text-rendering: geometricPrecision; }</style></defs>`;
-      svgData = svgData.replace(/<svg([^>]*)>/, `<svg$1>${defsBlock}`);
-    }
-
     svgData = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' + svgData;
 
     const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'cardinal-gantt-export.svg';
+    link.download = 'cardinal-gantt-presentation.svg';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -132,27 +85,41 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
 
   const simulatedX = getX(simulatedDate) + (DAY_WIDTH / 2);
 
+  // Helper to truncate text
+  const truncate = (str: string, maxLen: number) => {
+    return str.length > maxLen ? str.substring(0, maxLen - 1) + '…' : str;
+  };
+
   return (
-    <div className="flex flex-col h-full bg-black border border-zinc-800 rounded-lg overflow-hidden">
+    <div className="flex flex-col h-full bg-black border border-zinc-800 rounded-lg overflow-hidden font-sans">
+      {/* Chart Control Bar */}
       <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950 shrink-0">
-        <h2 className="text-xs font-mono uppercase tracking-wider text-zinc-400">
-          Active Gantt / Integrated Timeline ({totalTracks} Lane{totalTracks > 1 ? 's' : ''})
-        </h2>
+        <div>
+          <h2 className="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold">
+            Project Timeline & Schedule ({nodes.length} Tasks)
+          </h2>
+          <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest block mt-0.5">
+            Vector Canva-Ready Presentation Export
+          </span>
+        </div>
         <div className="flex items-center gap-4">
-          <div className="flex gap-4 text-[10px] font-mono text-zinc-500">
-            <div className="flex items-center gap-2"><div className="w-4 h-1.5 bg-zinc-800 rounded-full"></div> Planned</div>
-            <div className="flex items-center gap-2"><div className="w-4 h-2 bg-zinc-300 rounded-full"></div> Actual</div>
+          <div className="flex gap-4 text-[10px] font-mono text-zinc-400">
+            <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-[#38bdf8] rounded-sm"></div> PM</div>
+            <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-[#a855f7] rounded-sm"></div> Design</div>
+            <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-[#f43f5e] rounded-sm"></div> Eng</div>
+            <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-[#10b981] rounded-sm"></div> Everyone</div>
           </div>
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 text-[10px] font-mono bg-zinc-900 text-zinc-300 px-3 py-1.5 rounded hover:bg-zinc-800 hover:text-white transition-colors border border-zinc-800"
+            className="flex items-center gap-2 text-[10px] font-mono bg-zinc-100 text-black px-3.5 py-1.5 rounded hover:bg-white transition-colors font-bold tracking-wider"
           >
-            <Download className="w-3 h-3" />
-            EXPORT SVG
+            <Download className="w-3.5 h-3.5" />
+            EXPORT CANVA SVG
           </button>
         </div>
       </div>
 
+      {/* SVG Canvas Container */}
       <div className="flex-1 overflow-auto bg-black">
         <svg
           ref={svgRef}
@@ -160,21 +127,14 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
           height={totalHeight}
           viewBox={`0 0 ${totalWidth} ${totalHeight}`}
           xmlns="http://www.w3.org/2000/svg"
-          xmlnsXlink="http://www.w3.org/1999/xlink"
           shapeRendering="geometricPrecision"
           textRendering="geometricPrecision"
           style={{ backgroundColor: '#000000' }}
         >
-          <defs>
-            <style type="text/css">
-              {`@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap'); text { font-family: 'JetBrains Mono', 'Courier New', Courier, monospace; text-rendering: geometricPrecision; }`}
-            </style>
-          </defs>
-
-          {/* Crisp Black Background */}
+          {/* Solid Black Canvas Background */}
           <rect x={0} y={0} width={totalWidth} height={totalHeight} fill="#000000" />
 
-          {/* Grid Background Lines */}
+          {/* Vertical Day Grid Lines */}
           <g>
             {days.map((day, i) => (
               <line
@@ -187,47 +147,24 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
                 strokeWidth="1"
               />
             ))}
-            {Array.from({ length: totalTracks }).map((_, t) => (
+          </g>
+
+          {/* Row Divider Lines */}
+          <g>
+            {nodes.map((_, i) => (
               <line
-                key={`row-line-${t}`}
+                key={`row-line-${i}`}
                 x1={0}
-                y1={HEADER_HEIGHT + (t + 1) * ROW_HEIGHT}
+                y1={HEADER_HEIGHT + (i + 1) * ROW_HEIGHT}
                 x2={totalWidth}
-                y2={HEADER_HEIGHT + (t + 1) * ROW_HEIGHT}
+                y2={HEADER_HEIGHT + (i + 1) * ROW_HEIGHT}
                 stroke="#18181b"
                 strokeWidth="1"
               />
             ))}
           </g>
 
-          {/* Left Panel Track Headers */}
-          <g>
-            {Array.from({ length: totalTracks }).map((_, t) => (
-              <g key={`track-header-${t}`}>
-                <rect x={0} y={HEADER_HEIGHT + t * ROW_HEIGHT} width={LEFT_PANEL_WIDTH} height={ROW_HEIGHT} fill="#000000" />
-                <text
-                  x={10}
-                  y={HEADER_HEIGHT + t * ROW_HEIGHT + 36}
-                  fill="#71717a"
-                  fontSize="10"
-                  fontFamily="'JetBrains Mono', 'Courier New', monospace"
-                  fontWeight="bold"
-                >
-                  LANE {String(t + 1).padStart(2, '0')}
-                </text>
-                <line
-                  x1={LEFT_PANEL_WIDTH}
-                  y1={HEADER_HEIGHT + t * ROW_HEIGHT}
-                  x2={LEFT_PANEL_WIDTH}
-                  y2={HEADER_HEIGHT + (t + 1) * ROW_HEIGHT}
-                  stroke="#27272a"
-                  strokeWidth="1"
-                />
-              </g>
-            ))}
-          </g>
-
-          {/* Simulated Date Line */}
+          {/* Simulated "TODAY" Line */}
           <g>
             <line
               x1={simulatedX}
@@ -239,19 +176,19 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
               strokeDasharray="4 4"
             />
             <rect
-              x={simulatedX - 24}
-              y={HEADER_HEIGHT}
-              width={48}
-              height={14}
+              x={simulatedX - 22}
+              y={HEADER_HEIGHT + 4}
+              width={44}
+              height={16}
               fill="#ef4444"
-              rx="2"
+              rx="3"
             />
             <text
               x={simulatedX}
-              y={HEADER_HEIGHT + 10}
+              y={HEADER_HEIGHT + 15}
               fill="#ffffff"
-              fontSize="8"
-              fontFamily="'JetBrains Mono', 'Courier New', monospace"
+              fontSize="9"
+              fontFamily="Arial, Helvetica, sans-serif"
               fontWeight="bold"
               textAnchor="middle"
             >
@@ -259,10 +196,26 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             </text>
           </g>
 
-          {/* Date Axis Header */}
+          {/* Top Header Bar */}
           <g>
-            <rect x={0} y={0} width={totalWidth} height={HEADER_HEIGHT} fill="#000000" />
+            <rect x={0} y={0} width={totalWidth} height={HEADER_HEIGHT} fill="#0a0a0c" />
             <line x1={0} y1={HEADER_HEIGHT} x2={totalWidth} y2={HEADER_HEIGHT} stroke="#27272a" strokeWidth="1" />
+
+            {/* Left Panel Title */}
+            <text
+              x={16}
+              y={26}
+              fill="#a1a1aa"
+              fontSize="11"
+              fontFamily="Arial, Helvetica, sans-serif"
+              fontWeight="bold"
+            >
+              TASK / COMPONENT
+            </text>
+
+            <line x1={LEFT_PANEL_WIDTH} y1={0} x2={LEFT_PANEL_WIDTH} y2={totalHeight} stroke="#27272a" strokeWidth="1" />
+
+            {/* Date Headers */}
             {days.map((day, i) => {
               const dateObj = new Date(day);
               const formattedDate = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
@@ -270,10 +223,11 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
                 <text
                   key={`header-${day}`}
                   x={LEFT_PANEL_WIDTH + i * DAY_WIDTH + (DAY_WIDTH / 2)}
-                  y={24}
-                  fill="#52525b"
-                  fontSize="10"
-                  fontFamily="'JetBrains Mono', 'Courier New', monospace"
+                  y={26}
+                  fill="#71717a"
+                  fontSize="11"
+                  fontFamily="Arial, Helvetica, sans-serif"
+                  fontWeight="bold"
                   textAnchor="middle"
                 >
                   {formattedDate}
@@ -282,9 +236,10 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             })}
           </g>
 
-          {/* Tasks Packed into Compact Tracks */}
+          {/* Rows & Task Bars */}
           <g>
-            {packedNodes.map(({ node, trackIndex }) => {
+            {nodes.map((node, i) => {
+              const rowY = HEADER_HEIGHT + i * ROW_HEIGHT;
               const plannedX = getX(node.planned_start);
               const plannedW = getW(node.planned_start, node.planned_end);
 
@@ -294,37 +249,92 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
               const actualW = getW(actualStart, actualEnd);
 
               const bgColor = DEPT_COLORS[node.department as Department] || '#71717a';
-              const textColor = node.department === 'PM' || node.department === 'Design' ? '#000000' : '#ffffff';
-
-              const currentY = HEADER_HEIGHT + trackIndex * ROW_HEIGHT;
+              const deptTag = DEPT_SHORT[node.department as Department] || 'TASKS';
 
               let durationText = '';
               if (node.actual_start) {
-                const days = getDaysDiff(node.actual_start, node.actual_end || simulatedDate) + 1;
-                durationText = node.actual_end ? `${days}d` : `${days}d (ip)`;
+                const numDays = getDaysDiff(node.actual_start, node.actual_end || simulatedDate) + 1;
+                durationText = node.actual_end ? `${numDays}d` : `${numDays}d (ip)`;
               }
 
               return (
-                <g key={`node-${node.id}`} style={{ cursor: 'pointer' }} onClick={() => setSelectedNode(node)}>
-                  {/* Task ID, Department Tag & Title */}
+                <g
+                  key={`node-${node.id}`}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setSelectedNode(node)}
+                >
+                  {/* Row Base Background */}
+                  <rect
+                    x={0}
+                    y={rowY}
+                    width={totalWidth}
+                    height={ROW_HEIGHT}
+                    fill="#000000"
+                  />
+
+                  {/* Left Column Table Panel */}
+                  <rect
+                    x={0}
+                    y={rowY}
+                    width={LEFT_PANEL_WIDTH}
+                    height={ROW_HEIGHT}
+                    fill="#050507"
+                  />
+
+                  {/* Task ID */}
                   <text
-                    x={plannedX}
-                    y={currentY + 18}
-                    fill="#e4e4e7"
-                    fontSize="10"
-                    fontFamily="'JetBrains Mono', 'Courier New', monospace"
+                    x={14}
+                    y={rowY + 27}
+                    fill="#f4f4f5"
+                    fontSize="11"
+                    fontFamily="Arial, Helvetica, sans-serif"
                     fontWeight="bold"
                   >
-                    [{node.id}] [{node.department.toUpperCase()}] {node.title} {node.dependency && `[DEP: ${node.dependency}]`}
+                    {node.id}
                   </text>
 
-                  {/* Planned Schedule Bar */}
+                  {/* Dept Badge Indicator */}
+                  <rect
+                    x={64}
+                    y={rowY + 16}
+                    width={32}
+                    height={15}
+                    fill={bgColor}
+                    rx="3"
+                  />
+                  <text
+                    x={80}
+                    y={rowY + 27}
+                    fill="#000000"
+                    fontSize="8"
+                    fontFamily="Arial, Helvetica, sans-serif"
+                    fontWeight="bold"
+                    textAnchor="middle"
+                  >
+                    {deptTag}
+                  </text>
+
+                  {/* Task Title */}
+                  <text
+                    x={104}
+                    y={rowY + 27}
+                    fill="#d4d4d8"
+                    fontSize="11"
+                    fontFamily="Arial, Helvetica, sans-serif"
+                    fontWeight="500"
+                  >
+                    {truncate(node.title, 22)}
+                  </text>
+
+                  {/* Planned Schedule Container Bar */}
                   <rect
                     x={plannedX}
-                    y={currentY + 26}
+                    y={rowY + 14}
                     width={plannedW}
-                    height={8}
-                    fill="#27272a"
+                    height={18}
+                    fill="#18181b"
+                    stroke="#27272a"
+                    strokeWidth="1"
                     rx="4"
                   />
 
@@ -333,22 +343,38 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
                     <g>
                       <rect
                         x={actualX}
-                        y={currentY + 38}
+                        y={rowY + 14}
                         width={actualW}
                         height={18}
                         fill={bgColor}
-                        rx="5"
+                        rx="4"
                       />
-                      <text
-                        x={actualX + 6}
-                        y={currentY + 50}
-                        fill={textColor}
-                        fontSize="9"
-                        fontFamily="'JetBrains Mono', 'Courier New', monospace"
-                        fontWeight="bold"
-                      >
-                        {durationText}
-                      </text>
+
+                      {/* Duration Text */}
+                      {actualW > 28 ? (
+                        <text
+                          x={actualX + actualW / 2}
+                          y={rowY + 27}
+                          fill="#000000"
+                          fontSize="9"
+                          fontFamily="Arial, Helvetica, sans-serif"
+                          fontWeight="bold"
+                          textAnchor="middle"
+                        >
+                          {durationText}
+                        </text>
+                      ) : (
+                        <text
+                          x={actualX + actualW + 6}
+                          y={rowY + 27}
+                          fill="#a1a1aa"
+                          fontSize="9"
+                          fontFamily="Arial, Helvetica, sans-serif"
+                          fontWeight="bold"
+                        >
+                          {durationText}
+                        </text>
+                      )}
                     </g>
                   )}
                 </g>
@@ -358,6 +384,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
         </svg>
       </div>
 
+      {/* Task Details Modal */}
       {selectedNode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto font-mono">
           <div className="bg-zinc-950 border border-zinc-900 rounded-lg w-full max-w-md overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.8)] text-xs text-zinc-300 animate-fadeIn">
