@@ -14,21 +14,15 @@ const DEPT_COLORS: Record<Department, string> = {
   Everyone: '#10b981', // Emerald
 };
 
-const DEPT_SHORT: Record<Department, string> = {
-  PM: 'PM',
-  Design: 'DSG',
-  Engineering: 'ENG',
-  Everyone: 'ALL',
-};
-
 export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
-  const DAY_WIDTH = 54;
-  const ROW_HEIGHT = 44;
-  const HEADER_HEIGHT = 44;
-  const LEFT_PANEL_WIDTH = 260;
+  // Large Presentation Scales
+  const DAY_WIDTH = 90;
+  const ROW_HEIGHT = 90;
+  const HEADER_HEIGHT = 56;
+  const LEFT_PANEL_WIDTH = 130;
 
   // Date Math Helpers
   const parseDate = (d: string) => new Date(d).getTime();
@@ -65,7 +59,75 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
   const getW = (startStr: string, endStr: string) => (getDaysDiff(startStr, endStr) + 1) * DAY_WIDTH;
 
   const totalWidth = LEFT_PANEL_WIDTH + (totalDays * DAY_WIDTH);
-  const totalHeight = HEADER_HEIGHT + Math.max(1, nodes.length) * ROW_HEIGHT;
+
+  // --- COMPACT TRACK PACKING ALGORITHM ---
+  const getStartMs = (node: Node) => {
+    const p = parseDate(node.planned_start);
+    const a = node.actual_start ? parseDate(node.actual_start) : Infinity;
+    return Math.min(p, a);
+  };
+
+  const getEndMs = (node: Node) => {
+    const p = parseDate(node.planned_end);
+    const a = node.actual_end ? parseDate(node.actual_end) : (node.status === 'In Progress' ? simulatedTime : p);
+    return Math.max(p, a);
+  };
+
+  const sortedNodes = [...nodes].sort((a, b) => {
+    const startDiff = getStartMs(a) - getStartMs(b);
+    if (startDiff !== 0) return startDiff;
+    return getEndMs(a) - getEndMs(b);
+  });
+
+  const trackEndTimes: number[] = [];
+  const packedNodes: {
+    node: Node;
+    trackIndex: number;
+    plannedX: number;
+    plannedW: number;
+    actualX: number;
+    actualW: number;
+  }[] = [];
+  const BUFFER_MS = 12 * 60 * 60 * 1000; // 12hr buffer
+
+  sortedNodes.forEach(node => {
+    const startMs = getStartMs(node);
+    const endMs = getEndMs(node);
+
+    let assignedTrack = -1;
+    for (let t = 0; t < trackEndTimes.length; t++) {
+      if (trackEndTimes[t] + BUFFER_MS <= startMs) {
+        assignedTrack = t;
+        break;
+      }
+    }
+
+    if (assignedTrack === -1) {
+      assignedTrack = trackEndTimes.length;
+      trackEndTimes.push(endMs);
+    } else {
+      trackEndTimes[assignedTrack] = endMs;
+    }
+
+    const plannedX = getX(node.planned_start);
+    const plannedW = getW(node.planned_start, node.planned_end);
+    const actualStart = node.actual_start || node.planned_start;
+    const actualEnd = node.actual_end || (node.status === 'In Progress' ? simulatedDate : actualStart);
+    const actualX = getX(actualStart);
+    const actualW = getW(actualStart, actualEnd);
+
+    packedNodes.push({
+      node,
+      trackIndex: assignedTrack,
+      plannedX,
+      plannedW,
+      actualX,
+      actualW
+    });
+  });
+
+  const totalTracks = Math.max(1, trackEndTimes.length);
+  const totalHeight = HEADER_HEIGHT + (totalTracks * ROW_HEIGHT);
 
   const handleExport = () => {
     if (!svgRef.current) return;
@@ -77,7 +139,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'cardinal-gantt-presentation.svg';
+    link.download = 'cardinal-gantt-presentation-large.svg';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -85,36 +147,35 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
 
   const simulatedX = getX(simulatedDate) + (DAY_WIDTH / 2);
 
-  // Helper to truncate text
-  const truncate = (str: string, maxLen: number) => {
-    return str.length > maxLen ? str.substring(0, maxLen - 1) + '…' : str;
-  };
+  // Map for fast lookup during dependency line rendering
+  const nodeMap = new Map<string, typeof packedNodes[0]>();
+  packedNodes.forEach(item => nodeMap.set(item.node.id, item));
 
   return (
     <div className="flex flex-col h-full bg-black border border-zinc-800 rounded-lg overflow-hidden font-sans">
-      {/* Chart Control Bar */}
+      {/* Chart Header Bar */}
       <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950 shrink-0">
         <div>
-          <h2 className="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold">
-            Project Timeline & Schedule ({nodes.length} Tasks)
+          <h2 className="text-sm font-mono uppercase tracking-wider text-zinc-200 font-bold">
+            Project Execution Timeline ({nodes.length} Tasks packed into {totalTracks} Lane{totalTracks > 1 ? 's' : ''})
           </h2>
-          <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest block mt-0.5">
-            Vector Canva-Ready Presentation Export
+          <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block mt-0.5">
+            Ultra-Large Canva Presentation Export with Dependency Connectors
           </span>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex gap-4 text-[10px] font-mono text-zinc-400">
-            <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-[#38bdf8] rounded-sm"></div> PM</div>
-            <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-[#a855f7] rounded-sm"></div> Design</div>
-            <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-[#f43f5e] rounded-sm"></div> Eng</div>
-            <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-[#10b981] rounded-sm"></div> Everyone</div>
+        <div className="flex items-center gap-5">
+          <div className="flex gap-4 text-xs font-mono text-zinc-300">
+            <div className="flex items-center gap-1.5"><div className="w-3.5 h-3.5 bg-[#38bdf8] rounded-sm"></div> PM</div>
+            <div className="flex items-center gap-1.5"><div className="w-3.5 h-3.5 bg-[#a855f7] rounded-sm"></div> Design</div>
+            <div className="flex items-center gap-1.5"><div className="w-3.5 h-3.5 bg-[#f43f5e] rounded-sm"></div> Eng</div>
+            <div className="flex items-center gap-1.5"><div className="w-3.5 h-3.5 bg-[#10b981] rounded-sm"></div> Everyone</div>
           </div>
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 text-[10px] font-mono bg-zinc-100 text-black px-3.5 py-1.5 rounded hover:bg-white transition-colors font-bold tracking-wider"
+            className="flex items-center gap-2 text-xs font-mono bg-zinc-100 text-black px-4 py-2 rounded hover:bg-white transition-colors font-bold tracking-wider cursor-pointer shadow-lg"
           >
-            <Download className="w-3.5 h-3.5" />
-            EXPORT CANVA SVG
+            <Download className="w-4 h-4" />
+            EXPORT LARGE CANVA SVG
           </button>
         </div>
       </div>
@@ -131,6 +192,19 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
           textRendering="geometricPrecision"
           style={{ backgroundColor: '#000000' }}
         >
+          <defs>
+            <marker
+              id="arrowhead"
+              markerWidth="10"
+              markerHeight="7"
+              refX="9"
+              refY="3.5"
+              orient="auto"
+            >
+              <polygon points="0 0, 10 3.5, 0 7" fill="#ef4444" />
+            </marker>
+          </defs>
+
           {/* Solid Black Canvas Background */}
           <rect x={0} y={0} width={totalWidth} height={totalHeight} fill="#000000" />
 
@@ -144,23 +218,50 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
                 x2={LEFT_PANEL_WIDTH + i * DAY_WIDTH}
                 y2={totalHeight}
                 stroke="#18181b"
-                strokeWidth="1"
+                strokeWidth="1.5"
               />
             ))}
           </g>
 
-          {/* Row Divider Lines */}
+          {/* Lane Divider Lines */}
           <g>
-            {nodes.map((_, i) => (
+            {Array.from({ length: totalTracks }).map((_, t) => (
               <line
-                key={`row-line-${i}`}
+                key={`lane-line-${t}`}
                 x1={0}
-                y1={HEADER_HEIGHT + (i + 1) * ROW_HEIGHT}
+                y1={HEADER_HEIGHT + (t + 1) * ROW_HEIGHT}
                 x2={totalWidth}
-                y2={HEADER_HEIGHT + (i + 1) * ROW_HEIGHT}
-                stroke="#18181b"
-                strokeWidth="1"
+                y2={HEADER_HEIGHT + (t + 1) * ROW_HEIGHT}
+                stroke="#27272a"
+                strokeWidth="1.5"
               />
+            ))}
+          </g>
+
+          {/* Left Panel Track Headers */}
+          <g>
+            {Array.from({ length: totalTracks }).map((_, t) => (
+              <g key={`track-header-${t}`}>
+                <rect x={0} y={HEADER_HEIGHT + t * ROW_HEIGHT} width={LEFT_PANEL_WIDTH} height={ROW_HEIGHT} fill="#050507" />
+                <text
+                  x={16}
+                  y={HEADER_HEIGHT + t * ROW_HEIGHT + 52}
+                  fill="#f4f4f5"
+                  fontSize="15"
+                  fontFamily="Arial, Helvetica, sans-serif"
+                  fontWeight="bold"
+                >
+                  LANE {String(t + 1).padStart(2, '0')}
+                </text>
+                <line
+                  x1={LEFT_PANEL_WIDTH}
+                  y1={HEADER_HEIGHT + t * ROW_HEIGHT}
+                  x2={LEFT_PANEL_WIDTH}
+                  y2={HEADER_HEIGHT + (t + 1) * ROW_HEIGHT}
+                  stroke="#3f3f46"
+                  strokeWidth="2"
+                />
+              </g>
             ))}
           </g>
 
@@ -172,22 +273,22 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
               x2={simulatedX}
               y2={totalHeight}
               stroke="#ef4444"
-              strokeWidth="2"
-              strokeDasharray="4 4"
+              strokeWidth="2.5"
+              strokeDasharray="6 4"
             />
             <rect
-              x={simulatedX - 22}
-              y={HEADER_HEIGHT + 4}
-              width={44}
-              height={16}
+              x={simulatedX - 28}
+              y={HEADER_HEIGHT + 6}
+              width={56}
+              height={20}
               fill="#ef4444"
-              rx="3"
+              rx="4"
             />
             <text
               x={simulatedX}
-              y={HEADER_HEIGHT + 15}
+              y={HEADER_HEIGHT + 20}
               fill="#ffffff"
-              fontSize="9"
+              fontSize="11"
               fontFamily="Arial, Helvetica, sans-serif"
               fontWeight="bold"
               textAnchor="middle"
@@ -196,26 +297,25 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             </text>
           </g>
 
-          {/* Top Header Bar */}
+          {/* Date Axis Header Bar */}
           <g>
             <rect x={0} y={0} width={totalWidth} height={HEADER_HEIGHT} fill="#0a0a0c" />
-            <line x1={0} y1={HEADER_HEIGHT} x2={totalWidth} y2={HEADER_HEIGHT} stroke="#27272a" strokeWidth="1" />
+            <line x1={0} y1={HEADER_HEIGHT} x2={totalWidth} y2={HEADER_HEIGHT} stroke="#3f3f46" strokeWidth="2" />
 
-            {/* Left Panel Title */}
             <text
               x={16}
-              y={26}
+              y={34}
               fill="#a1a1aa"
-              fontSize="11"
+              fontSize="14"
               fontFamily="Arial, Helvetica, sans-serif"
               fontWeight="bold"
             >
-              TASK / COMPONENT
+              LANES
             </text>
 
-            <line x1={LEFT_PANEL_WIDTH} y1={0} x2={LEFT_PANEL_WIDTH} y2={totalHeight} stroke="#27272a" strokeWidth="1" />
+            <line x1={LEFT_PANEL_WIDTH} y1={0} x2={LEFT_PANEL_WIDTH} y2={totalHeight} stroke="#3f3f46" strokeWidth="2" />
 
-            {/* Date Headers */}
+            {/* Date Columns */}
             {days.map((day, i) => {
               const dateObj = new Date(day);
               const formattedDate = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
@@ -223,9 +323,9 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
                 <text
                   key={`header-${day}`}
                   x={LEFT_PANEL_WIDTH + i * DAY_WIDTH + (DAY_WIDTH / 2)}
-                  y={26}
-                  fill="#71717a"
-                  fontSize="11"
+                  y={34}
+                  fill="#d4d4d8"
+                  fontSize="14"
                   fontFamily="Arial, Helvetica, sans-serif"
                   fontWeight="bold"
                   textAnchor="middle"
@@ -236,20 +336,49 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             })}
           </g>
 
-          {/* Rows & Task Bars */}
+          {/* Dependency Connector Arrows */}
           <g>
-            {nodes.map((node, i) => {
-              const rowY = HEADER_HEIGHT + i * ROW_HEIGHT;
-              const plannedX = getX(node.planned_start);
-              const plannedW = getW(node.planned_start, node.planned_end);
+            {packedNodes.map(targetItem => {
+              if (!targetItem.node.dependency) return null;
+              const sourceItem = nodeMap.get(targetItem.node.dependency);
+              if (!sourceItem) return null;
 
-              const actualStart = node.actual_start || node.planned_start;
-              const actualEnd = node.actual_end || (node.status === 'In Progress' ? simulatedDate : actualStart);
-              const actualX = getX(actualStart);
-              const actualW = getW(actualStart, actualEnd);
+              // Source end coordinates (center of bar)
+              const srcX = sourceItem.node.actual_start
+                ? (sourceItem.actualX + sourceItem.actualW)
+                : (sourceItem.plannedX + sourceItem.plannedW);
+              const srcY = HEADER_HEIGHT + sourceItem.trackIndex * ROW_HEIGHT + 66;
 
+              // Target start coordinates
+              const trgX = targetItem.node.actual_start
+                ? targetItem.actualX
+                : targetItem.plannedX;
+              const trgY = HEADER_HEIGHT + targetItem.trackIndex * ROW_HEIGHT + 66;
+
+              // Bezier Curve
+              const controlDist = Math.max(30, Math.abs(trgX - srcX) / 2);
+              const pathD = `M ${srcX} ${srcY} C ${srcX + controlDist} ${srcY}, ${trgX - controlDist} ${trgY}, ${trgX} ${trgY}`;
+
+              return (
+                <g key={`dep-${sourceItem.node.id}-${targetItem.node.id}`}>
+                  <path
+                    d={pathD}
+                    stroke="#ef4444"
+                    strokeWidth="2.5"
+                    fill="none"
+                    strokeDasharray="5 3"
+                    markerEnd="url(#arrowhead)"
+                  />
+                </g>
+              );
+            })}
+          </g>
+
+          {/* Packed Task Nodes */}
+          <g>
+            {packedNodes.map(({ node, trackIndex, plannedX, plannedW, actualX, actualW }) => {
               const bgColor = DEPT_COLORS[node.department as Department] || '#71717a';
-              const deptTag = DEPT_SHORT[node.department as Department] || 'TASKS';
+              const rowY = HEADER_HEIGHT + trackIndex * ROW_HEIGHT;
 
               let durationText = '';
               if (node.actual_start) {
@@ -257,83 +386,36 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
                 durationText = node.actual_end ? `${numDays}d` : `${numDays}d (ip)`;
               }
 
+              // Text position logic: if bar is narrow or near edge, place outside
+              const labelText = `[${node.id}] [${node.department.toUpperCase()}] ${node.title}`;
+              const labelX = plannedX;
+
               return (
                 <g
                   key={`node-${node.id}`}
                   style={{ cursor: 'pointer' }}
                   onClick={() => setSelectedNode(node)}
                 >
-                  {/* Row Base Background */}
-                  <rect
-                    x={0}
-                    y={rowY}
-                    width={totalWidth}
-                    height={ROW_HEIGHT}
-                    fill="#000000"
-                  />
-
-                  {/* Left Column Table Panel */}
-                  <rect
-                    x={0}
-                    y={rowY}
-                    width={LEFT_PANEL_WIDTH}
-                    height={ROW_HEIGHT}
-                    fill="#050507"
-                  />
-
-                  {/* Task ID */}
+                  {/* Task Header Text (Large 14px Bold) */}
                   <text
-                    x={14}
-                    y={rowY + 27}
-                    fill="#f4f4f5"
-                    fontSize="11"
+                    x={labelX}
+                    y={rowY + 28}
+                    fill="#ffffff"
+                    fontSize="14"
                     fontFamily="Arial, Helvetica, sans-serif"
                     fontWeight="bold"
                   >
-                    {node.id}
+                    {labelText}
                   </text>
 
-                  {/* Dept Badge Indicator */}
-                  <rect
-                    x={64}
-                    y={rowY + 16}
-                    width={32}
-                    height={15}
-                    fill={bgColor}
-                    rx="3"
-                  />
-                  <text
-                    x={80}
-                    y={rowY + 27}
-                    fill="#000000"
-                    fontSize="8"
-                    fontFamily="Arial, Helvetica, sans-serif"
-                    fontWeight="bold"
-                    textAnchor="middle"
-                  >
-                    {deptTag}
-                  </text>
-
-                  {/* Task Title */}
-                  <text
-                    x={104}
-                    y={rowY + 27}
-                    fill="#d4d4d8"
-                    fontSize="11"
-                    fontFamily="Arial, Helvetica, sans-serif"
-                    fontWeight="500"
-                  >
-                    {truncate(node.title, 22)}
-                  </text>
-
-                  {/* Planned Schedule Container Bar */}
+                  {/* Planned Container Bar */}
                   <rect
                     x={plannedX}
-                    y={rowY + 14}
+                    y={rowY + 36}
                     width={plannedW}
-                    height={18}
-                    fill="#18181b"
-                    stroke="#27272a"
+                    height={14}
+                    fill="#27272a"
+                    stroke="#3f3f46"
                     strokeWidth="1"
                     rx="4"
                   />
@@ -343,20 +425,20 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
                     <g>
                       <rect
                         x={actualX}
-                        y={rowY + 14}
+                        y={rowY + 54}
                         width={actualW}
-                        height={18}
+                        height={24}
                         fill={bgColor}
-                        rx="4"
+                        rx="5"
                       />
 
-                      {/* Duration Text */}
-                      {actualW > 28 ? (
+                      {/* Duration Text inside or beside actual bar */}
+                      {actualW > 45 ? (
                         <text
                           x={actualX + actualW / 2}
-                          y={rowY + 27}
+                          y={rowY + 70}
                           fill="#000000"
-                          fontSize="9"
+                          fontSize="12"
                           fontFamily="Arial, Helvetica, sans-serif"
                           fontWeight="bold"
                           textAnchor="middle"
@@ -365,10 +447,10 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
                         </text>
                       ) : (
                         <text
-                          x={actualX + actualW + 6}
-                          y={rowY + 27}
-                          fill="#a1a1aa"
-                          fontSize="9"
+                          x={actualX + actualW + 10}
+                          y={rowY + 70}
+                          fill="#d4d4d8"
+                          fontSize="12"
                           fontFamily="Arial, Helvetica, sans-serif"
                           fontWeight="bold"
                         >
