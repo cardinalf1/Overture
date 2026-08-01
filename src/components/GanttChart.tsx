@@ -18,12 +18,12 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
-  // Scaled-up presentation dimensions based on example.svg architecture
-  const DAY_WIDTH = 72;
-  const ROW_HEIGHT = 88;
-  const HEADER_HEIGHT = 54;
-  const LEFT_PANEL_WIDTH = 110;
-  const DEPT_HEADER_HEIGHT = 34;
+  // Huge Presentation Scale Dimensions
+  const DAY_WIDTH = 120;
+  const ROW_HEIGHT = 130;
+  const HEADER_HEIGHT = 70;
+  const LEFT_PANEL_WIDTH = 160;
+  const DEPT_HEADER_HEIGHT = 46;
 
   // Date Math Helpers
   const parseDate = (d: string) => new Date(d).getTime();
@@ -77,17 +77,17 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
       <g key={`dept-${dept}`}>
         <rect x={0} y={currentY} width={totalWidth} height={DEPT_HEADER_HEIGHT} fill="#09090b" />
         <text
-          x={14}
-          y={currentY + 23}
-          fill="#71717a"
-          fontSize="16"
+          x={20}
+          y={currentY + 31}
+          fill="#a1a1aa"
+          fontSize="22"
           fontFamily="monospace"
           fontWeight="bold"
-          letterSpacing="2"
+          letterSpacing="3"
         >
           // {dept.toUpperCase()}
         </text>
-        <line x1={0} y1={currentY + DEPT_HEADER_HEIGHT} x2={totalWidth} y2={currentY + DEPT_HEADER_HEIGHT} stroke="#27272a" strokeWidth="1.5" />
+        <line x1={0} y1={currentY + DEPT_HEADER_HEIGHT} x2={totalWidth} y2={currentY + DEPT_HEADER_HEIGHT} stroke="#27272a" strokeWidth="2" />
       </g>
     );
     currentY += DEPT_HEADER_HEIGHT;
@@ -114,19 +114,19 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
         <g key={`node-${node.id}`} style={{ cursor: 'pointer' }} onClick={() => setSelectedNode(node)}>
           {/* Row Background & Separator Line */}
           <rect x={0} y={currentY} width={totalWidth} height={ROW_HEIGHT} fill="none" />
-          <line x1={0} y1={currentY + ROW_HEIGHT} x2={totalWidth} y2={currentY + ROW_HEIGHT} stroke="#18181b" strokeWidth="1" />
+          <line x1={0} y1={currentY + ROW_HEIGHT} x2={totalWidth} y2={currentY + ROW_HEIGHT} stroke="#18181b" strokeWidth="2" />
 
           {/* Left Panel ID */}
           <rect x={0} y={currentY} width={LEFT_PANEL_WIDTH} height={ROW_HEIGHT} fill="#000000" />
-          <text x={14} y={currentY + 52} fill="#71717a" fontSize="16" fontFamily="monospace" fontWeight="bold">{node.id}</text>
-          <line x1={LEFT_PANEL_WIDTH} y1={currentY} x2={LEFT_PANEL_WIDTH} y2={currentY + ROW_HEIGHT} stroke="#27272a" strokeWidth="1.5" />
+          <text x={20} y={currentY + 80} fill="#a1a1aa" fontSize="24" fontFamily="monospace" fontWeight="bold">{node.id}</text>
+          <line x1={LEFT_PANEL_WIDTH} y1={currentY} x2={LEFT_PANEL_WIDTH} y2={currentY + ROW_HEIGHT} stroke="#27272a" strokeWidth="2" />
 
-          {/* Task Name Title (Above bars, anchored to planned start) */}
+          {/* Task Name Title (HUGE 28px Bold) */}
           <text
             x={plannedX}
-            y={currentY + 28}
+            y={currentY + 42}
             fill="#ffffff"
-            fontSize="18"
+            fontSize="28"
             fontFamily="monospace"
             fontWeight="bold"
           >
@@ -136,29 +136,29 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
           {/* Planned Bar */}
           <rect
             x={plannedX}
-            y={currentY + 36}
+            y={currentY + 54}
             width={plannedW}
-            height={12}
+            height={16}
             fill="#27272a"
-            rx="4"
+            rx="6"
           />
 
-          {/* Actual Bar & Duration Text Inside */}
+          {/* Actual Bar & HUGE Duration Text Inside */}
           {node.actual_start && (
             <g>
               <rect
                 x={actualX}
-                y={currentY + 52}
+                y={currentY + 78}
                 width={actualW}
-                height={26}
+                height={36}
                 fill={bgColor}
-                rx="6"
+                rx="8"
               />
               <text
-                x={actualX + 10}
-                y={currentY + 70}
+                x={actualX + 16}
+                y={currentY + 104}
                 fill={textColor}
-                fontSize="14"
+                fontSize="20"
                 fontFamily="monospace"
                 fontWeight="bold"
               >
@@ -184,7 +184,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'cardinal-gantt-export-large.svg';
+    link.download = 'cardinal-gantt-export-huge.svg';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -198,7 +198,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
       <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950 shrink-0">
         <div>
           <h2 className="text-sm font-mono uppercase tracking-wider text-zinc-200 font-bold">
-            Active Gantt / Timeline ({nodes.length} Nodes)
+            Active Gantt / Timeline ({nodes.length} Nodes) — HUGE Text Mode
           </h2>
         </div>
         <div className="flex items-center gap-4">
@@ -211,7 +211,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             className="flex items-center gap-2 text-xs font-mono bg-zinc-100 text-black px-4 py-2 rounded hover:bg-white transition-colors font-bold tracking-wider cursor-pointer shadow-lg"
           >
             <Download className="w-4 h-4" />
-            EXPORT SVG
+            EXPORT HUGE SVG
           </button>
         </div>
       </div>
@@ -236,7 +236,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
                 x2={LEFT_PANEL_WIDTH + i * DAY_WIDTH}
                 y2={totalHeight}
                 stroke="#18181b"
-                strokeWidth="1.5"
+                strokeWidth="2"
               />
             ))}
           </g>
@@ -249,22 +249,22 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
               x2={simulatedX}
               y2={totalHeight}
               stroke="#ef4444"
-              strokeWidth="2.5"
-              strokeDasharray="4 4"
+              strokeWidth="3.5"
+              strokeDasharray="6 4"
             />
             <rect
-              x={simulatedX - 28}
-              y={HEADER_HEIGHT + 5}
-              width={56}
-              height={20}
+              x={simulatedX - 40}
+              y={HEADER_HEIGHT + 7}
+              width={80}
+              height={28}
               fill="#ef4444"
-              rx="4"
+              rx="6"
             />
             <text
               x={simulatedX}
-              y={HEADER_HEIGHT + 19}
+              y={HEADER_HEIGHT + 26}
               fill="#ffffff"
-              fontSize="12"
+              fontSize="16"
               fontFamily="monospace"
               fontWeight="bold"
               textAnchor="middle"
@@ -276,7 +276,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
           {/* Top Date Header */}
           <g>
             <rect x={0} y={0} width={totalWidth} height={HEADER_HEIGHT} fill="#000000" />
-            <line x1={0} y1={HEADER_HEIGHT} x2={totalWidth} y2={HEADER_HEIGHT} stroke="#27272a" strokeWidth="1.5" />
+            <line x1={0} y1={HEADER_HEIGHT} x2={totalWidth} y2={HEADER_HEIGHT} stroke="#27272a" strokeWidth="2" />
             {days.map((day, i) => {
               const dateObj = new Date(day);
               const formattedDate = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
@@ -284,9 +284,9 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
                 <text
                   key={`header-${day}`}
                   x={LEFT_PANEL_WIDTH + i * DAY_WIDTH + (DAY_WIDTH / 2)}
-                  y={32}
-                  fill="#71717a"
-                  fontSize="15"
+                  y={44}
+                  fill="#a1a1aa"
+                  fontSize="22"
                   fontFamily="monospace"
                   fontWeight="bold"
                   textAnchor="middle"
