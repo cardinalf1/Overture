@@ -175,13 +175,20 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
   const appTotalHeight = appCurrentY;
   const appSimulatedX = getAppX(simulatedDate) + (APP_DAY_WIDTH / 2);
 
-  // --- PRESENTATION SVG EXPORT (Non-Overlapping Department Rows, High Visibility) ---
+  // --- PRESENTATION SVG EXPORT (Non-Overlapping Department Rows, High Visibility, Valid XML) ---
   const handleExport = () => {
     const EXPORT_DAY_WIDTH = 120;
     const EXPORT_ROW_HEIGHT = 130;
     const EXPORT_HEADER_HEIGHT = 74;
     const EXPORT_LEFT_PANEL_WIDTH = 140;
     const EXPORT_DEPT_HEADER_HEIGHT = 44;
+
+    const escapeXml = (str: string) => str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
 
     const getExportX = (dateStr: string) => EXPORT_LEFT_PANEL_WIDTH + getDaysDiff(days[0], dateStr) * EXPORT_DAY_WIDTH;
     const getExportW = (startStr: string, endStr: string) => (getDaysDiff(startStr, endStr) + 1) * EXPORT_DAY_WIDTH;
@@ -202,7 +209,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
       const formattedDate = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
       const x = EXPORT_LEFT_PANEL_WIDTH + i * EXPORT_DAY_WIDTH + (EXPORT_DAY_WIDTH / 2);
       exportElements.push(`
-        <text x="${x}" y="48" fill="#a1a1aa" font-size="24" font-family="monospace" font-weight="bold" text-anchor="middle">${formattedDate}</text>
+        <text x="${x}" y="48" fill="#a1a1aa" font-size="24" font-family="monospace" font-weight="bold" text-anchor="middle">${escapeXml(formattedDate)}</text>
         <line x1="${EXPORT_LEFT_PANEL_WIDTH + i * EXPORT_DAY_WIDTH}" y1="${EXPORT_HEADER_HEIGHT}" x2="${EXPORT_LEFT_PANEL_WIDTH + i * EXPORT_DAY_WIDTH}" y2="99999" stroke="#18181b" stroke-width="2"/>
       `);
     });
@@ -221,7 +228,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
     Object.entries(grouped).forEach(([dept, deptNodes]) => {
       exportElements.push(`
         <rect x="0" y="${exportY}" width="${exportTotalWidth}" height="${EXPORT_DEPT_HEADER_HEIGHT}" fill="#09090b"/>
-        <text x="20" y="${exportY + 30}" fill="#a1a1aa" font-size="22" font-family="monospace" font-weight="bold" letter-spacing="3">// ${dept.toUpperCase()}</text>
+        <text x="20" y="${exportY + 30}" fill="#a1a1aa" font-size="22" font-family="monospace" font-weight="bold" letter-spacing="3">// ${escapeXml(dept.toUpperCase())}</text>
         <line x1="0" y1="${exportY + EXPORT_DEPT_HEADER_HEIGHT}" x2="${exportTotalWidth}" y2="${exportY + EXPORT_DEPT_HEADER_HEIGHT}" stroke="#27272a" stroke-width="3"/>
       `);
       exportY += EXPORT_DEPT_HEADER_HEIGHT;
@@ -249,14 +256,14 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
           <g>
             <line x1="0" y1="${exportY + EXPORT_ROW_HEIGHT}" x2="${exportTotalWidth}" y2="${exportY + EXPORT_ROW_HEIGHT}" stroke="#18181b" stroke-width="2"/>
             <rect x="0" y="${exportY}" width="${EXPORT_LEFT_PANEL_WIDTH}" height="${EXPORT_ROW_HEIGHT}" fill="#000000"/>
-            <text x="20" y="${exportY + 80}" fill="#a1a1aa" font-size="24" font-family="monospace" font-weight="bold">${node.id}</text>
+            <text x="20" y="${exportY + 80}" fill="#a1a1aa" font-size="24" font-family="monospace" font-weight="bold">${escapeXml(node.id)}</text>
             <line x1="${EXPORT_LEFT_PANEL_WIDTH}" y1="${exportY}" x2="${EXPORT_LEFT_PANEL_WIDTH}" y2="${exportY + EXPORT_ROW_HEIGHT}" stroke="#27272a" stroke-width="3"/>
 
-            <text x="${plannedX}" y="${exportY + 42}" fill="#ffffff" font-size="28" font-family="monospace" font-weight="bold">${titleText}</text>
+            <text x="${plannedX}" y="${exportY + 42}" fill="#ffffff" font-size="28" font-family="monospace" font-weight="bold">${escapeXml(titleText)}</text>
             <rect x="${plannedX}" y="${exportY + 54}" width="${plannedW}" height="18" fill="#27272a" rx="6"/>
             ${node.actual_start ? `
               <rect x="${actualX}" y="${exportY + 78}" width="${actualW}" height="38" fill="${bgColor}" rx="8"/>
-              <text x="${actualX + 16}" y="${exportY + 104}" fill="${textColor}" font-size="22" font-family="monospace" font-weight="bold">${durationText}</text>
+              <text x="${actualX + 16}" y="${exportY + 104}" fill="${textColor}" font-size="22" font-family="monospace" font-weight="bold">${escapeXml(durationText)}</text>
             ` : ''}
           </g>
         `);
