@@ -14,16 +14,19 @@ const DEPT_COLORS: Record<Department, string> = {
   Everyone: '#3f3f46', // zinc-700
 };
 
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
 export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 
-  // --- Normal Web App Dimensions (Pristine, elegant, department-grouped on-screen) ---
-  const APP_DAY_WIDTH = 72;
-  const APP_ROW_HEIGHT = 84;
-  const APP_HEADER_HEIGHT = 54;
-  const APP_LEFT_PANEL_WIDTH = 110;
-  const APP_DEPT_HEADER_HEIGHT = 34;
+  // --- Spacious Web App Dimensions ---
+  const APP_DAY_WIDTH = 90;
+  const APP_ROW_HEIGHT = 92;
+  const APP_HEADER_HEIGHT = 70;
+  const APP_LEFT_PANEL_WIDTH = 120;
+  const APP_DEPT_HEADER_HEIGHT = 36;
 
   // Date Math Helpers
   const parseDate = (d: string) => new Date(d).getTime();
@@ -60,6 +63,18 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
   const getAppW = (startStr: string, endStr: string) => (getDaysDiff(startStr, endStr) + 1) * APP_DAY_WIDTH;
   const appTotalWidth = APP_LEFT_PANEL_WIDTH + (totalDays * APP_DAY_WIDTH);
 
+  // Group nodes by month for dual-tier date header
+  const monthGroups: { monthLabel: string; startIdx: number; count: number }[] = [];
+  days.forEach((dayStr, idx) => {
+    const dateObj = new Date(dayStr);
+    const label = `${MONTH_NAMES[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+    if (monthGroups.length === 0 || monthGroups[monthGroups.length - 1].monthLabel !== label) {
+      monthGroups.push({ monthLabel: label, startIdx: idx, count: 1 });
+    } else {
+      monthGroups[monthGroups.length - 1].count++;
+    }
+  });
+
   // Group nodes by department for Web App view
   const grouped = nodes.reduce((acc, node) => {
     if (!acc[node.department]) acc[node.department] = [];
@@ -78,9 +93,9 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
         <rect x={0} y={appCurrentY} width={appTotalWidth} height={APP_DEPT_HEADER_HEIGHT} fill="#09090b" />
         <text
           x={16}
-          y={appCurrentY + 23}
+          y={appCurrentY + 24}
           fill="#a1a1aa"
-          fontSize="15"
+          fontSize="14"
           fontFamily="monospace"
           fontWeight="bold"
           letterSpacing="2"
@@ -118,15 +133,15 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
 
           {/* Left Panel ID */}
           <rect x={0} y={appCurrentY} width={APP_LEFT_PANEL_WIDTH} height={APP_ROW_HEIGHT} fill="#000000" />
-          <text x={16} y={appCurrentY + 54} fill="#a1a1aa" fontSize="15" fontFamily="monospace" fontWeight="bold">{node.id}</text>
+          <text x={16} y={appCurrentY + 58} fill="#a1a1aa" fontSize="14" fontFamily="monospace" fontWeight="bold">{node.id}</text>
           <line x1={APP_LEFT_PANEL_WIDTH} y1={appCurrentY} x2={APP_LEFT_PANEL_WIDTH} y2={appCurrentY + APP_ROW_HEIGHT} stroke="#27272a" strokeWidth="1.5" />
 
           {/* Task Name Title */}
           <text
             x={plannedX}
-            y={appCurrentY + 28}
+            y={appCurrentY + 30}
             fill="#ffffff"
-            fontSize="16"
+            fontSize="15"
             fontFamily="monospace"
             fontWeight="bold"
           >
@@ -136,11 +151,11 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
           {/* Planned Container Bar */}
           <rect
             x={plannedX}
-            y={appCurrentY + 36}
+            y={appCurrentY + 38}
             width={plannedW}
             height={14}
             fill="#27272a"
-            rx="4"
+            rx="5"
           />
 
           {/* Actual Progress Bar & Duration Text */}
@@ -148,15 +163,15 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             <g>
               <rect
                 x={actualX}
-                y={appCurrentY + 54}
+                y={appCurrentY + 56}
                 width={actualW}
-                height={22}
+                height={26}
                 fill={bgColor}
-                rx="6"
+                rx="7"
               />
               <text
-                x={actualX + 10}
-                y={appCurrentY + 70}
+                x={actualX + 12}
+                y={appCurrentY + 74}
                 fill={textColor}
                 fontSize="13"
                 fontFamily="monospace"
@@ -175,12 +190,12 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
   const appTotalHeight = appCurrentY;
   const appSimulatedX = getAppX(simulatedDate) + (APP_DAY_WIDTH / 2);
 
-  // --- NEW PRESENTATION SVG EXPORT (Full-Width, Compact Track-Packed, Huge Typography, Zero Collisions) ---
+  // --- PRESENTATION SVG EXPORT (Clean Title-Extent Track Packed, Dual-Tier Dates, Zero Collisions) ---
   const handleExport = () => {
-    const EXPORT_DAY_WIDTH = 100;
+    const EXPORT_DAY_WIDTH = 120;
     const EXPORT_ROW_HEIGHT = 160;
-    const EXPORT_HEADER_HEIGHT = 90;
-    const EXPORT_LEFT_PANEL_WIDTH = 0; // No side ID column
+    const EXPORT_HEADER_HEIGHT = 100;
+    const EXPORT_LEFT_PANEL_WIDTH = 0; // Full-width canvas
 
     const escapeXml = (str: string) => str
       .replace(/&/g, '&amp;')
@@ -202,11 +217,11 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
     };
 
     const getEndMs = (node: Node) => {
-      const p = parseDate(node.planned_end);
-      const a = node.actual_end ? parseDate(node.actual_end) : (node.status === 'In Progress' ? simulatedTime : p);
-      const maxBarEndMs = Math.max(p, a);
+      const p = parseDate(node.planned_start);
+      const pe = parseDate(node.planned_end);
+      const a = node.actual_end ? parseDate(node.actual_end) : (node.status === 'In Progress' ? simulatedTime : pe);
+      const maxBarEndMs = Math.max(pe, a);
 
-      // Title visual extent calculation (approx 30px per char for 52px monospace font)
       const plannedX = getExportX(node.planned_start);
       const titleText = `${node.title}${node.dependency ? ` [DEP: ${node.dependency}]` : ''}`;
       const titleVisualWidthPx = titleText.length * 30 + 40;
@@ -275,20 +290,38 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
 
     const exportElements: string[] = [];
 
-    // Header Background & Lines
+    // Header Background
     exportElements.push(`
       <rect x="0" y="0" width="${exportTotalWidth}" height="${EXPORT_HEADER_HEIGHT}" fill="#000000"/>
       <line x1="0" y1="${EXPORT_HEADER_HEIGHT}" x2="${exportTotalWidth}" y2="${EXPORT_HEADER_HEIGHT}" stroke="#27272a" stroke-width="3"/>
     `);
 
-    // Date Grid Lines & Headers
+    // Dual-Tier Date Header in Export
+    monthGroups.forEach(mg => {
+      const startX = mg.startIdx * EXPORT_DAY_WIDTH;
+      const width = mg.count * EXPORT_DAY_WIDTH;
+      exportElements.push(`
+        <rect x="${startX}" y="0" width="${width}" height="40" fill="#09090b" stroke="#27272a" stroke-width="1.5"/>
+        <text x="${startX + width / 2}" y="26" fill="#a1a1aa" font-size="20" font-family="monospace" font-weight="bold" letter-spacing="3" text-anchor="middle">${escapeXml(mg.monthLabel)}</text>
+      `);
+    });
+
     days.forEach((day, i) => {
       const dateObj = new Date(day);
-      const formattedDate = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
-      const x = EXPORT_LEFT_PANEL_WIDTH + i * EXPORT_DAY_WIDTH + (EXPORT_DAY_WIDTH / 2);
+      const dayNum = dateObj.getDate();
+      const dayName = DAY_NAMES[dateObj.getDay()];
+      const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+      const x = i * EXPORT_DAY_WIDTH;
+
+      if (isWeekend) {
+        exportElements.push(`
+          <rect x="${x}" y="${EXPORT_HEADER_HEIGHT}" width="${EXPORT_DAY_WIDTH}" height="${exportTotalHeight - EXPORT_HEADER_HEIGHT}" fill="#09090b" opacity="0.6"/>
+        `);
+      }
+
       exportElements.push(`
-        <text x="${x}" y="56" fill="#a1a1aa" font-size="40" font-family="monospace" font-weight="bold" text-anchor="middle">${escapeXml(formattedDate)}</text>
-        <line x1="${EXPORT_LEFT_PANEL_WIDTH + i * EXPORT_DAY_WIDTH}" y1="${EXPORT_HEADER_HEIGHT}" x2="${EXPORT_LEFT_PANEL_WIDTH + i * EXPORT_DAY_WIDTH}" y2="${exportTotalHeight}" stroke="#18181b" stroke-width="2.5"/>
+        <text x="${x + EXPORT_DAY_WIDTH / 2}" y="74" fill="${isWeekend ? '#ef4444' : '#a1a1aa'}" font-size="22" font-family="monospace" font-weight="bold" text-anchor="middle">${dayNum} ${dayName}</text>
+        <line x1="${x}" y1="${EXPORT_HEADER_HEIGHT}" x2="${x}" y2="${exportTotalHeight}" stroke="#18181b" stroke-width="2"/>
       `);
     });
 
@@ -342,7 +375,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'cardinal-gantt-maximized.svg';
+    link.download = 'cardinal-gantt-presentation.svg';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -369,7 +402,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             className="flex items-center gap-2 text-xs font-mono bg-zinc-100 text-black px-4 py-2 rounded hover:bg-white transition-colors font-bold tracking-wider cursor-pointer shadow-lg"
           >
             <Download className="w-4 h-4" />
-            EXPORT MAXIMIZED SVG
+            EXPORT PRESENTATION SVG
           </button>
         </div>
       </div>
@@ -384,6 +417,26 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
           xmlns="http://www.w3.org/2000/svg"
           style={{ backgroundColor: '#000000' }}
         >
+          {/* Weekend Background Columns */}
+          <g>
+            {days.map((day, i) => {
+              const dateObj = new Date(day);
+              const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+              if (!isWeekend) return null;
+              return (
+                <rect
+                  key={`weekend-${day}`}
+                  x={APP_LEFT_PANEL_WIDTH + i * APP_DAY_WIDTH}
+                  y={APP_HEADER_HEIGHT}
+                  width={APP_DAY_WIDTH}
+                  height={appTotalHeight - APP_HEADER_HEIGHT}
+                  fill="#09090b"
+                  opacity="0.6"
+                />
+              );
+            })}
+          </g>
+
           {/* Grid Background Lines */}
           <g>
             {days.map((day, i) => (
@@ -412,7 +465,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             />
             <rect
               x={appSimulatedX - 30}
-              y={APP_HEADER_HEIGHT + 5}
+              y={APP_HEADER_HEIGHT + 6}
               width={60}
               height={22}
               fill="#ef4444"
@@ -420,7 +473,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             />
             <text
               x={appSimulatedX}
-              y={APP_HEADER_HEIGHT + 20}
+              y={APP_HEADER_HEIGHT + 21}
               fill="#ffffff"
               fontSize="11"
               fontFamily="monospace"
@@ -431,25 +484,52 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             </text>
           </g>
 
-          {/* Top Date Header */}
+          {/* Top Dual-Tier Date Header */}
           <g>
-            <rect x={0} y={0} width={appTotalWidth} height={APP_HEADER_HEIGHT} fill="#000000" />
+            {/* Top Tier: Month Banners */}
+            {monthGroups.map(mg => {
+              const startX = getAppX(days[mg.startIdx]);
+              const width = mg.count * APP_DAY_WIDTH;
+              return (
+                <g key={`month-${mg.monthLabel}`}>
+                  <rect x={startX} y={0} width={width} height={28} fill="#09090b" stroke="#27272a" strokeWidth="1" />
+                  <text
+                    x={startX + width / 2}
+                    y={19}
+                    fill="#a1a1aa"
+                    fontSize="12"
+                    fontFamily="monospace"
+                    fontWeight="bold"
+                    letterSpacing="2"
+                    textAnchor="middle"
+                  >
+                    {mg.monthLabel}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Bottom Tier: Day Columns */}
+            <rect x={0} y={28} width={appTotalWidth} height={APP_HEADER_HEIGHT - 28} fill="#000000" />
             <line x1={0} y1={APP_HEADER_HEIGHT} x2={appTotalWidth} y2={APP_HEADER_HEIGHT} stroke="#27272a" strokeWidth="1.5" />
             {days.map((day, i) => {
               const dateObj = new Date(day);
-              const formattedDate = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
+              const dayNum = dateObj.getDate();
+              const dayName = DAY_NAMES[dateObj.getDay()];
+              const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+
               return (
                 <text
                   key={`header-${day}`}
                   x={APP_LEFT_PANEL_WIDTH + i * APP_DAY_WIDTH + (APP_DAY_WIDTH / 2)}
-                  y={34}
-                  fill="#a1a1aa"
-                  fontSize="14"
+                  y={54}
+                  fill={isWeekend ? '#ef4444' : '#a1a1aa'}
+                  fontSize="13"
                   fontFamily="monospace"
                   fontWeight="bold"
                   textAnchor="middle"
                 >
-                  {formattedDate}
+                  {dayNum} {dayName}
                 </text>
               );
             })}
