@@ -90,7 +90,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
     // Department Section Header
     appSvgElements.push(
       <g key={`dept-${dept}`}>
-        <rect x={0} y={appCurrentY} width={appTotalWidth} height={APP_DEPT_HEADER_HEIGHT} fill="#09090b" />
+        <rect x={0} y={appCurrentY} width={appTotalWidth} height={APP_DEPT_HEADER_HEIGHT} fill="#09090b" fillOpacity="0.8" />
         <text
           x={16}
           y={appCurrentY + 24}
@@ -132,7 +132,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
           <line x1={0} y1={appCurrentY + APP_ROW_HEIGHT} x2={appTotalWidth} y2={appCurrentY + APP_ROW_HEIGHT} stroke="#18181b" strokeWidth="1.5" />
 
           {/* Left Panel ID */}
-          <rect x={0} y={appCurrentY} width={APP_LEFT_PANEL_WIDTH} height={APP_ROW_HEIGHT} fill="#000000" />
+          <rect x={0} y={appCurrentY} width={APP_LEFT_PANEL_WIDTH} height={APP_ROW_HEIGHT} fill="#09090b" fillOpacity="0.9" />
           <text x={16} y={appCurrentY + 58} fill="#a1a1aa" fontSize="14" fontFamily="monospace" fontWeight="bold">{node.id}</text>
           <line x1={APP_LEFT_PANEL_WIDTH} y1={appCurrentY} x2={APP_LEFT_PANEL_WIDTH} y2={appCurrentY + APP_ROW_HEIGHT} stroke="#27272a" strokeWidth="1.5" />
 
@@ -190,7 +190,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
   const appTotalHeight = appCurrentY;
   const appSimulatedX = getAppX(simulatedDate) + (APP_DAY_WIDTH / 2);
 
-  // --- ULTRA-HUGE PRESENTATION SVG EXPORT (Every task gets its own dedicated row, huge 52px text, zero collisions) ---
+  // --- TRANSPARENT ULTRA-HUGE PRESENTATION SVG EXPORT ---
   const handleExport = () => {
     const EXPORT_DAY_WIDTH = 130;
     const EXPORT_ROW_HEIGHT = 170;
@@ -212,9 +212,8 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
     let exportY = EXPORT_HEADER_HEIGHT;
     const exportElements: string[] = [];
 
-    // Header Background
+    // Transparent Header Divider
     exportElements.push(`
-      <rect x="0" y="0" width="${exportTotalWidth}" height="${EXPORT_HEADER_HEIGHT}" fill="#000000"/>
       <line x1="0" y1="${EXPORT_HEADER_HEIGHT}" x2="${exportTotalWidth}" y2="${EXPORT_HEADER_HEIGHT}" stroke="#27272a" stroke-width="4"/>
     `);
 
@@ -223,7 +222,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
       const startX = EXPORT_LEFT_PANEL_WIDTH + mg.startIdx * EXPORT_DAY_WIDTH;
       const width = mg.count * EXPORT_DAY_WIDTH;
       exportElements.push(`
-        <rect x="${startX}" y="0" width="${width}" height="44" fill="#09090b" stroke="#27272a" stroke-width="2"/>
+        <rect x="${startX}" y="0" width="${width}" height="44" fill="#09090b" fill-opacity="0.9" stroke="#27272a" stroke-width="2"/>
         <text x="${startX + width / 2}" y="30" fill="#a1a1aa" font-size="24" font-family="monospace" font-weight="bold" letter-spacing="3" text-anchor="middle">${escapeXml(mg.monthLabel)}</text>
       `);
     });
@@ -237,7 +236,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
 
       if (isWeekend) {
         exportElements.push(`
-          <rect x="${x}" y="${EXPORT_HEADER_HEIGHT}" width="${EXPORT_DAY_WIDTH}" height="99999" fill="#09090b" opacity="0.6"/>
+          <rect x="${x}" y="${EXPORT_HEADER_HEIGHT}" width="${EXPORT_DAY_WIDTH}" height="99999" fill="#09090b" opacity="0.4"/>
         `);
       }
 
@@ -250,7 +249,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
     // Department Sections & Dedicated Non-Overlapping Rows (1 Task Per Row!)
     Object.entries(grouped).forEach(([dept, deptNodes]) => {
       exportElements.push(`
-        <rect x="0" y="${exportY}" width="${exportTotalWidth}" height="${EXPORT_DEPT_HEADER_HEIGHT}" fill="#09090b"/>
+        <rect x="0" y="${exportY}" width="${exportTotalWidth}" height="${EXPORT_DEPT_HEADER_HEIGHT}" fill="#09090b" fill-opacity="0.8"/>
         <text x="30" y="${exportY + 38}" fill="#a1a1aa" font-size="32" font-family="monospace" font-weight="bold" letter-spacing="4">// ${escapeXml(dept.toUpperCase())}</text>
         <line x1="0" y1="${exportY + EXPORT_DEPT_HEADER_HEIGHT}" x2="${exportTotalWidth}" y2="${exportY + EXPORT_DEPT_HEADER_HEIGHT}" stroke="#27272a" stroke-width="4"/>
       `);
@@ -279,7 +278,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
           <g>
             <line x1="0" y1="${exportY + EXPORT_ROW_HEIGHT}" x2="${exportTotalWidth}" y2="${exportY + EXPORT_ROW_HEIGHT}" stroke="#18181b" stroke-width="2.5"/>
 
-            <rect x="0" y="${exportY}" width="${EXPORT_LEFT_PANEL_WIDTH}" height="${EXPORT_ROW_HEIGHT}" fill="#000000"/>
+            <rect x="0" y="${exportY}" width="${EXPORT_LEFT_PANEL_WIDTH}" height="${EXPORT_ROW_HEIGHT}" fill="#09090b" fill-opacity="0.9"/>
             <text x="30" y="${exportY + 105}" fill="#a1a1aa" font-size="38" font-family="monospace" font-weight="bold">${escapeXml(node.id)}</text>
             <line x1="${EXPORT_LEFT_PANEL_WIDTH}" y1="${exportY}" x2="${EXPORT_LEFT_PANEL_WIDTH}" y2="${exportY + EXPORT_ROW_HEIGHT}" stroke="#27272a" stroke-width="4"/>
 
@@ -308,25 +307,26 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
     // Replace dummy height with exact exportY
     const finalElements = exportElements.join('\n').replace(/99999/g, exportY.toString());
 
-    let svgData = `<?xml version="1.0" standalone="no"?>\n<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n<svg width="${exportTotalWidth}" height="${exportY}" viewBox="0 0 ${exportTotalWidth} ${exportY}" xmlns="http://www.w3.org/2000/svg" style="background-color: #000000;">\n<rect x="0" y="0" width="${exportTotalWidth}" height="${exportY}" fill="#000000"/>\n${finalElements}\n</svg>`;
+    // TRANSPARENT BACKGROUND SVG
+    let svgData = `<?xml version="1.0" standalone="no"?>\n<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n<svg width="${exportTotalWidth}" height="${exportY}" viewBox="0 0 ${exportTotalWidth} ${exportY}" xmlns="http://www.w3.org/2000/svg" style="background-color: transparent;">\n${finalElements}\n</svg>`;
 
     const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'cardinal-gantt-ultra-large.svg';
+    link.download = 'cardinal-gantt-transparent.svg';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   return (
-    <div className="flex flex-col h-full bg-black border border-zinc-800 rounded-lg overflow-hidden font-sans">
+    <div className="flex flex-col h-full bg-transparent border border-zinc-800/80 rounded-lg overflow-hidden font-sans">
       {/* Web App Header Bar */}
-      <div className="p-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-950 shrink-0">
+      <div className="p-4 border-b border-zinc-800/80 flex justify-between items-center bg-zinc-950/60 backdrop-blur-md shrink-0">
         <div>
           <h2 className="text-sm font-mono uppercase tracking-wider text-zinc-200 font-bold">
-            Active Gantt / Timeline ({nodes.length} Nodes)
+            Active Gantt / Timeline ({nodes.length} Nodes) — Transparent Mode
           </h2>
         </div>
         <div className="flex items-center gap-4">
@@ -341,20 +341,20 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             className="flex items-center gap-2 text-xs font-mono bg-zinc-100 text-black px-4 py-2 rounded hover:bg-white transition-colors font-bold tracking-wider cursor-pointer shadow-lg"
           >
             <Download className="w-4 h-4" />
-            EXPORT ULTRA-LARGE SVG
+            EXPORT TRANSPARENT SVG
           </button>
         </div>
       </div>
 
       {/* On-Screen Web App SVG Timeline Canvas */}
-      <div className="flex-1 overflow-auto bg-black">
+      <div className="flex-1 overflow-auto bg-transparent">
         <svg
           ref={svgRef}
           width={appTotalWidth}
           height={appTotalHeight}
           viewBox={`0 0 ${appTotalWidth} ${appTotalHeight}`}
           xmlns="http://www.w3.org/2000/svg"
-          style={{ backgroundColor: '#000000' }}
+          style={{ backgroundColor: 'transparent' }}
         >
           {/* Weekend Background Columns */}
           <g>
@@ -370,7 +370,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
                   width={APP_DAY_WIDTH}
                   height={appTotalHeight - APP_HEADER_HEIGHT}
                   fill="#09090b"
-                  opacity="0.6"
+                  opacity="0.4"
                 />
               );
             })}
@@ -431,7 +431,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
               const width = mg.count * APP_DAY_WIDTH;
               return (
                 <g key={`month-${mg.monthLabel}`}>
-                  <rect x={startX} y={0} width={width} height={28} fill="#09090b" stroke="#27272a" strokeWidth="1" />
+                  <rect x={startX} y={0} width={width} height={28} fill="#09090b" fillOpacity="0.9" stroke="#27272a" strokeWidth="1" />
                   <text
                     x={startX + width / 2}
                     y={19}
@@ -449,7 +449,7 @@ export function GanttChart({ nodes, simulatedDate }: GanttChartProps) {
             })}
 
             {/* Bottom Tier: Day Columns */}
-            <rect x={0} y={28} width={appTotalWidth} height={APP_HEADER_HEIGHT - 28} fill="#000000" />
+            <rect x={0} y={28} width={appTotalWidth} height={APP_HEADER_HEIGHT - 28} fill="#000000" fillOpacity="0.8" />
             <line x1={0} y1={APP_HEADER_HEIGHT} x2={appTotalWidth} y2={APP_HEADER_HEIGHT} stroke="#27272a" strokeWidth="1.5" />
             {days.map((day, i) => {
               const dateObj = new Date(day);
